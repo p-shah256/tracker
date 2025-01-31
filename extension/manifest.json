@@ -1,0 +1,12 @@
+{
+  "manifest_version": 3,
+  "name": "Telegram Message Sender",
+  "version": "1.0",
+  "permissions": ["scripting", "activeTab"],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "action": {
+    "default_title": "Send Hi to Telegram"
+  }
+}
