@@ -1,8 +1,8 @@
 chrome.action.onClicked.addListener(async (tab) => {
   try {
-    // Load the configuration file
     const config = await fetch(chrome.runtime.getURL('config.json')).then((response) => response.json());
     const discordWebhookUrl = config.discordWebhookUrl;
+    const botId = config.botId; // Add the bot's ID to your config file
 
     const result = await chrome.scripting.executeScript({
       target: { tabId: tab.id },
@@ -17,7 +17,7 @@ chrome.action.onClicked.addListener(async (tab) => {
     formData.append('file', blob, 'page.html');
 
     const payload = {
-      content: `HTML content from: ${currentUrl}`,
+      content: `<@${botId}> here's what I found for you: \nHTML content from: ${currentUrl}`,
     };
     formData.append('payload_json', JSON.stringify(payload));
 
