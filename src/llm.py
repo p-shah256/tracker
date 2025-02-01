@@ -1,4 +1,5 @@
 import logging
+from pathlib import Path
 import cleaner
 from openai import OpenAI
 import os
@@ -105,7 +106,7 @@ Extraction Rules:
    - Maintain relationship between requirements
 """
 
-def get_llm_response(html_file_path: str) -> str :
+def parse(html_file_path: Path) -> str :
     try:
         client = OpenAI(
             api_key=os.getenv('GEMINI_KEY'),

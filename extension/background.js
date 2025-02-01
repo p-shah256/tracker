@@ -17,7 +17,7 @@ chrome.action.onClicked.addListener(async (tab) => {
     formData.append('file', blob, 'page.html');
 
     const payload = {
-      content: `<@${botId}> here's what I found for you: \nHTML content from: ${currentUrl}`,
+      content: `<@${botId}> ${currentUrl}`,
     };
     formData.append('payload_json', JSON.stringify(payload));
 

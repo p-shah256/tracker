@@ -109,7 +109,7 @@ def add_job_to_db(job_data: dict, message_id: int, conn: psycopg2.extensions.con
     finally:
         cursor.close()
 
-def process_job_posting(str_llm_content: str, message_id: int, db_config: dict):
+def process_job_posting(str_llm_content: str, message_id: int, db_config: dict)-> dict | None: 
     conn = psycopg2.connect(**db_config)
     try:
         job_data = json.loads(str_llm_content)
