@@ -1,34 +1,36 @@
 chrome.action.onClicked.addListener(async (tab) => {
-
   try {
-    // Inject a script to grab the entire HTML of the current page
+    // Load the configuration file
+    const config = await fetch(chrome.runtime.getURL('config.json')).then((response) => response.json());
+    const discordWebhookUrl = config.discordWebhookUrl;
+
     const result = await chrome.scripting.executeScript({
       target: { tabId: tab.id },
       func: () => document.documentElement.outerHTML,
     });
 
-    const htmlContent = result[0].result; // Get the HTML content
-    const currentUrl = tab.url; // Get the current URL
+    const htmlContent = result[0].result;
+    const currentUrl = tab.url;
 
-    // Create a Blob (file) from the HTML content
     const blob = new Blob([htmlContent], { type: 'text/html' });
     const formData = new FormData();
-    formData.append('document', blob, 'page.html'); // Attach the file
-    formData.append('chat_id', chatId); // Add chat ID
-    formData.append('caption', `@shah256_bot HTML from: ${currentUrl}`); // Add caption with URL
+    formData.append('file', blob, 'page.html');
 
-    // Send the file to Telegram
-    const url = `https://api.telegram.org/bot${botToken}/sendDocument`;
-    const response = await fetch(url, {
+    const payload = {
+      content: `HTML content from: ${currentUrl}`,
+    };
+    formData.append('payload_json', JSON.stringify(payload));
+
+    const response = await fetch(discordWebhookUrl, {
       method: 'POST',
       body: formData,
     });
 
-    const data = await response.json();
-    if (data.ok) {
-      console.log('File sent successfully!');
+    if (response.ok) {
+      console.log('File sent successfully to Discord!');
     } else {
-      console.error('Failed to send file:', data);
+      const errorData = await response.json();
+      console.error('Failed to send file to Discord:', errorData);
     }
   } catch (error) {
     console.error('Error:', error);
