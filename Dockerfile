@@ -1,6 +1,11 @@
 FROM python:3.9-slim
+
 WORKDIR /app
+
 COPY requirements.txt .
-RUN pip install -r requirements.txt gunicorn
+
+RUN pip install --no-cache-dir -r requirements.txt
+
 COPY . .
-CMD ["gunicorn", "--bind", "0.0.0.0:5000", "app:app"]
+
+CMD ["python", "./src/discord_bot.py"]

@@ -14,7 +14,7 @@ Expected Output Structure:
     "company": string,
     "position": {
       "name": string,
-      "level": string  // Entry, Mid, Senior, Lead, etc.
+      "level": int  // years of experience.. see details for rule 0
     },
     "skills": [
       {
@@ -31,7 +31,7 @@ Expected Output Structure:
     "metadata": {
       "company": string,
       "role": string,
-      "level": string,
+      "level": int,
       "location": {
         "primary": string,
         "remote": boolean,
@@ -140,8 +140,6 @@ def get_llm_response(html_file_path: str) -> str :
             logger.error(f"Full exception details: {traceback.format_exc()}")
             raise
 
-        logger.info("Received response from OpenAI API")
-        logger.debug(response.choices[0].message.content)
         if response.choices[0].message.content is None:
             logger.error("Error: No content received in the OpenAI API response")
             raise

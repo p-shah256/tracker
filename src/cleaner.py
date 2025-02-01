@@ -1,3 +1,4 @@
+import json
 from bs4 import BeautifulSoup
 import re
 
@@ -29,27 +30,52 @@ def clean_html(html_content):
             text_blocks.append(text)
 
     clean_text = '\n\n'.join(text_blocks)
-
     clean_text = re.sub(r'\s+', ' ', clean_text)
     clean_text = re.sub(r'\n\s*\n', '\n\n', clean_text)
-
     return clean_text.strip()
 
 
 
 def clean_llm_response(text):
     """
-    Takes your LLM's markdown soup and turns it into clean text.
-    Because who needs formatting when you've got pure content? 😎
+    Cleans up the LLM response while preserving valid JSON structure.
+    Returns the cleaned JSON string or raises ValueError if invalid.
     """
+    # First, let's strip those pesky markdown code blocks
+    if text.startswith('```'):
+        # Find the first and last ``` and extract content between them
+        start = text.find('\n', text.find('```')) + 1
+        end = text.rfind('```')
+        if end == -1:  # No closing backticks? No problem!
+            text = text[start:]
+        else:
+            text = text[start:end]
+    
+    # Remove any leading/trailing whitespace
+    text = text.strip()
+    
+    try:
+        # Validate it's actually JSON by parsing it
+        parsed = json.loads(text)
+        # And get a clean, consistently formatted version
+        return json.dumps(parsed, indent=2)
+    except json.JSONDecodeError as e:
+        # If it's not valid JSON, let's try some cleanup strategies
+        
+        # Strategy 1: Remove any markdown artifacts that might be breaking our JSON
+        text = re.sub(r'(?m)^#.*$', '', text)  # Remove markdown headers
+        text = re.sub(r'(?m)^\s*[-*+]\s.*$', '', text)  # Remove list items
+        text = re.sub(r'[*_]{1,2}([^*_]+)[*_]{1,2}', r'\1', text)  # Remove bold/italic
+        
+        # Strategy 2: Fix common JSON syntax issues
+        text = re.sub(r',(\s*[}\]])', r'\1', text)  # Remove trailing commas
+        text = re.sub(r'"\s*:\s*"([^"]*)"(\s*[,}])', r'": "\1"\2', text)  # Fix quote issues
+        
+        try:
+            # Try parsing again after cleanup
+            parsed = json.loads(text)
+            return json.dumps(parsed, indent=2)
+        except json.JSONDecodeError:
+            # If we still can't parse it, return the cleaned text but warn about invalid JSON
+            raise ValueError(f"Could not parse response as valid JSON: {str(e)}\nCleaned text: {text}")
 
-    text = re.sub(r'```[\s\S]*?```', '', text)
-    text = re.sub(r'(?m)^    .*$', '', text)
-    text = re.sub(r'#{1,6}\s.*$', '', text, flags=re.MULTILINE)
-    text = re.sub(r'^\s*[-*+]\s', '', text, flags=re.MULTILINE)
-    text = re.sub(r'^\s*\d+\.\s', '', text, flags=re.MULTILINE)
-    text = re.sub(r'[*_]{1,2}([^*_]+)[*_]{1,2}', r'\1', text)
-    text = re.sub(r'\n{3,}', '\n\n', text)
-    text = re.sub(r'[\[\](){}`>#]', '', text)
-
-    return text.strip()
