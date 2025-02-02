@@ -96,7 +96,7 @@ async def process_discord_job(message: discord.Message, db_config: dict) -> None
                     if not db_freindly:
                         await message.reply("Hey Bhagwan! LLM ne jawab hi nahi diya! Bilkul Iyer jaise chup ho gaya!")
                         return
-
+                    report = llm.report(db_freindly)
                     await _post_to_channel(processed_channel, db_freindly, message)
                 except Exception as e:
                     await message.reply(f"Arey bapre bap! Processing mein gadbad ho gayi: {str(e)}\nBilkul Mehta Sahab ke calculations jaise!")
@@ -130,16 +130,19 @@ class JobBot(discord.Client):
         self.db_config = db_config
         self.db_config = db_config
 
-    async def setup_hook(self) -> None:
-        logger.info(f'Logged in as {self.user}')
+    async def on_message(self, message: discord.Message) -> None:
+        logger.info("NEW message received")
+        await process_discord_job(message, self.db_config)
+
+    async def on_ready(self):
+        logger.info(f'Bot is ready and connected to {len(self.guilds)} guild(s)')
         for guild in self.guilds:
             for channel in guild.text_channels:
                 if channel.permissions_for(guild.me).send_messages:
                     async for message in channel.history(limit=20):
+                        logger.info("Starting to process older messages")
                         await process_discord_job(message, self.db_config)
 
-    async def on_message(self, message: discord.Message) -> None:
-        await process_discord_job(message, self.db_config)
 
 def main():
     """Entry point with minimal complexity"""

@@ -1,9 +1,11 @@
+import json
 import logging
 from pathlib import Path
 import cleaner
 from openai import OpenAI
 import os
 import traceback
+from string import Template
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -149,6 +151,52 @@ def parse(html_file_path: Path) -> str :
 
     except FileNotFoundError as e:
         logger.error(f"File not found: {html_file_path}. Error: {e}")
+        raise 
+    except Exception as e:
+        logger.error(f"Unexpected error occurred at get_llm_response: {e}")
+        logger.error("Traceback details:\n" + traceback.format_exc())
+        raise
+
+def report(db_freindly: dict) -> str :
+    try:
+        prompt_path = Path('./config/tailor_prompt.txt')
+        resume_path = Path('./config/resume.txt')
+        with prompt_path.open('r') as f:
+            template = Template(f.read())
+        with resume_path.open('r') as f:
+            resume = Template(f.read())
+
+        prompt = template.substitute(
+            JOB_DESCRIPTION=json.dumps(db_freindly),
+            RESUME=resume
+        )
+        client = OpenAI(
+            api_key=os.getenv('GEMINI_KEY'),
+            base_url="https://generativelanguage.googleapis.com/v1beta/openai/"
+        )
+
+        try:
+            response = client.chat.completions.create(
+                model="gemini-1.5-flash",
+                n=1,
+                messages=[ {"role": "system", "content": "You are a helpful assistant."},
+                    { "role": "user", "content": prompt }
+                ]
+            )
+        except Exception as e:
+            logger.error(f"API call failed with: {str(e)}")
+            logger.error(f"Full exception details: {traceback.format_exc()}")
+            raise
+
+        if response.choices[0].message.content is None:
+            logger.error("Error: No content received in the OpenAI API response")
+            raise
+        clean_response = cleaner.clean_llm_response(response.choices[0].message.content)
+        logger.info(clean_response)
+        return clean_response
+
+    except FileNotFoundError as e:
+        logger.error(f"File not found: resume_path or prompt_path. Error: {e}")
         raise 
     except Exception as e:
         logger.error(f"Unexpected error occurred at get_llm_response: {e}")

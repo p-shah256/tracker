@@ -43,6 +43,7 @@ dummy_data = """{
     ]
   }
 }"""
+
 def not_none(value):
     if value is not None:
         return value
@@ -145,7 +146,3 @@ def if_processed(message_id: int, db_config: dict) -> bool:
         return False
     finally:
         conn.close()
-
-
-if __name__ == "__main__":
-    process_job_posting(dummy_data, 2)
