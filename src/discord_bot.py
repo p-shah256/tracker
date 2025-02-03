@@ -1,3 +1,4 @@
+import json
 import discord
 import os
 import logging
@@ -7,6 +8,7 @@ import db_process
 import argparse
 import tempfile
 from dotenv import load_dotenv
+from io import BytesIO  # Use BytesIO instead of StringIO
 
 # -------------------- Private Implementation Details --------------------
 def _setup_logging():
@@ -37,23 +39,31 @@ def _get_env_config(is_test: bool = False) -> dict:
     print(config)
     return config
 
-async def _post_to_channel(channel: discord.TextChannel, db_freindly: dict, message: discord.Message) -> None:
+async def _post_to_channel(channel: discord.TextChannel, db_freindly: dict, message: discord.Message, report_data: dict) -> None:
     """Jethalal's premium job posting formatter - ekdum first class!"""
     position_name = db_freindly.get('position', {}).get('name', 'Babuchak position not found!')
     company_name = db_freindly.get('company', 'Gada Electronics level company not found!')
     job_url = message.content[23:] or "URL missing! Bilkul Mehta Sahab ki savings account jaisa empty!"
-    bullets = db_freindly.get('bullets', 'Iyer ke jokes jaise kuch bhi nahi mila!')
-    match_before = db_freindly.get('match_before', 'Popatlal ki shaadi jaise - N/A')
-    match_after = db_freindly.get('match_after', 'Jethalal ki diet plan jaise - non-existent!')
+    bullets = report_data.get('tailored_bullets', 'Iyer ke jokes jaise kuch bhi nahi mila!')
+    match_before = report_data.get('initial_score', 'Popatlal ki shaadi jaise - N/A')
+    match_after = report_data.get('optimized_score', 'Jethalal ki diet plan jaise - non-existent!')
     level = db_freindly.get('position', {}).get('level', {})
+
+    # Convert the bullets data to a JSON string
+    bullets_json = json.dumps(bullets, indent=4)
+    # Create a BytesIO object from the encoded JSON string
+    file_like = BytesIO(bullets_json.encode('utf-8'))
+    file = discord.File(file_like, filename="bullets.json")
+
+    # Send the message with the file attachment
     await channel.send(
         f"**Position:** {position_name}\n"
         f"**Level:** {level}\n"
         f"**Company:** {company_name}\n"
         f"**URL:** {job_url}\n"
-        f"**Babita ji's Tips:** {bullets}\n"
         f"**Before Babita ji's Tips:** {match_before}\n"
-        f"**After Babita ji's Tips:** {match_after}\n\n"
+        f"**After Babita ji's Tips:** {match_after}\n\n",
+        file=file, 
     )
 
 from typing import Union
@@ -96,8 +106,8 @@ async def process_discord_job(message: discord.Message, db_config: dict) -> None
                     if not db_freindly:
                         await message.reply("Hey Bhagwan! LLM ne jawab hi nahi diya! Bilkul Iyer jaise chup ho gaya!")
                         return
-                    report = llm.report(db_freindly)
-                    await _post_to_channel(processed_channel, db_freindly, message)
+                    report_data = llm.report(db_freindly)
+                    await _post_to_channel(processed_channel, db_freindly, message, report_data)
                 except Exception as e:
                     await message.reply(f"Arey bapre bap! Processing mein gadbad ho gayi: {str(e)}\nBilkul Mehta Sahab ke calculations jaise!")
                     logger.error(f"Error processing attachment: {e}")
@@ -140,7 +150,6 @@ class JobBot(discord.Client):
             for channel in guild.text_channels:
                 if channel.permissions_for(guild.me).send_messages:
                     async for message in channel.history(limit=20):
-                        logger.info("Starting to process older messages")
                         await process_discord_job(message, self.db_config)
 
 

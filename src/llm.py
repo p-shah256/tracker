@@ -157,10 +157,10 @@ def parse(html_file_path: Path) -> str :
         logger.error("Traceback details:\n" + traceback.format_exc())
         raise
 
-def report(db_freindly: dict) -> str :
+def report(db_freindly: dict) -> dict :
     try:
-        prompt_path = Path('./config/tailor_prompt.txt')
-        resume_path = Path('./config/resume.txt')
+        prompt_path = Path('./src/config/tailor_prompt.txt')
+        resume_path = Path('./src/config/resume.txt')
         with prompt_path.open('r') as f:
             template = Template(f.read())
         with resume_path.open('r') as f:
@@ -193,7 +193,8 @@ def report(db_freindly: dict) -> str :
             raise
         clean_response = cleaner.clean_llm_response(response.choices[0].message.content)
         logger.info(clean_response)
-        return clean_response
+        report_data = json.loads(clean_response)
+        return report_data
 
     except FileNotFoundError as e:
         logger.error(f"File not found: resume_path or prompt_path. Error: {e}")

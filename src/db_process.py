@@ -110,6 +110,7 @@ def add_job_to_db(job_data: dict, message_id: int, conn: psycopg2.extensions.con
     finally:
         cursor.close()
 
+# TODO: this is redundant. merge it
 def process_job_posting(str_llm_content: str, message_id: int, db_config: dict)-> dict | None: 
     conn = psycopg2.connect(**db_config)
     try:
