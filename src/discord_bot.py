@@ -9,10 +9,10 @@ import argparse
 import tempfile
 from dotenv import load_dotenv
 from io import BytesIO  # Use BytesIO instead of StringIO
+import asyncio
 
 # -------------------- Private Implementation Details --------------------
 def _setup_logging():
-    """Hidden implementation detail for logging configuration"""
     logging.basicConfig(
         level=logging.INFO,
         format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
@@ -25,7 +25,6 @@ def _get_env_config(is_test: bool = False) -> dict:
     load_dotenv()
     required_vars = {'DB_USER', 'DB_PASS', 'DB_HOST', 'DB_PORT', 'DISCORD_BOT_TOKEN'}
     env_vars = {var: os.getenv(var) for var in required_vars}
-
     config= {
         "db": {
             "dbname": "postgres",
@@ -40,22 +39,18 @@ def _get_env_config(is_test: bool = False) -> dict:
     return config
 
 async def _post_to_channel(channel: discord.TextChannel, db_freindly: dict, message: discord.Message, report_data: dict) -> None:
-    """Jethalal's premium job posting formatter - ekdum first class!"""
-    position_name = db_freindly.get('position', {}).get('name', 'Babuchak position not found!')
-    company_name = db_freindly.get('company', 'Gada Electronics level company not found!')
-    job_url = message.content[23:] or "URL missing! Bilkul Mehta Sahab ki savings account jaisa empty!"
-    bullets = report_data.get('tailored_bullets', 'Iyer ke jokes jaise kuch bhi nahi mila!')
-    match_before = report_data.get('initial_score', 'Popatlal ki shaadi jaise - N/A')
-    match_after = report_data.get('optimized_score', 'Jethalal ki diet plan jaise - non-existent!')
+    position_name = db_freindly.get('position', {}).get('name', '')
+    company_name = db_freindly.get('company', '')
+    job_url = message.content[23:] or "URL missing!"
+    bullets = report_data.get('tailored_bullets', '')
+    match_before = report_data.get('initial_score', '')
+    match_after = report_data.get('optimized_score', '')
     level = db_freindly.get('position', {}).get('level', {})
 
-    # Convert the bullets data to a JSON string
     bullets_json = json.dumps(bullets, indent=4)
-    # Create a BytesIO object from the encoded JSON string
     file_like = BytesIO(bullets_json.encode('utf-8'))
     file = discord.File(file_like, filename="bullets.json")
 
-    # Send the message with the file attachment
     await channel.send(
         f"**Position:** {position_name}\n"
         f"**Level:** {level}\n"
@@ -68,7 +63,6 @@ async def _post_to_channel(channel: discord.TextChannel, db_freindly: dict, mess
 
 from typing import Union
 def _is_valid_job_message(message: discord.Message, bot_user: Union[discord.User, discord.Member]) -> bool:
-    """Hidden implementation detail for message validation"""
     return all([
         message.author != bot_user,
         bot_user in message.mentions,
@@ -97,25 +91,34 @@ async def process_discord_job(message: discord.Message, db_config: dict) -> None
                 file_path = Path(temp_file.name)
                 try:
                     await attachment.save(file_path)
-                    llm_data = llm.parse(file_path)
-                    db_freindly = db_process.process_job_posting(llm_data, message.id, db_config)
+
+                    loop = asyncio.get_running_loop()
+                    llm_parsed: str = await loop.run_in_executor(None, llm.parse_job_desc, file_path)
+
+                    job_data = json.loads(llm_parsed)
+                    db_friendly = job_data.get("db_friendly", {})
+                    if not isinstance(db_friendly, dict):
+                        raise TypeError("Missing db_friendly data structure")
+                    if not db_friendly:
+                        await message.reply("Could not parse the job description")
+                        return
+                    db_process.add_job_to_db(db_friendly, message.id, db_config)
+                    report_data = llm.report(db_friendly)
+
                     processed_channel = discord.utils.get(message.guild.text_channels, name='processed-jobs')
                     if not processed_channel:
                         logger.info("Creating missing processed-jobs channel")
                         processed_channel = await message.guild.create_text_channel('processed-jobs')
-                    if not db_freindly:
-                        await message.reply("Hey Bhagwan! LLM ne jawab hi nahi diya! Bilkul Iyer jaise chup ho gaya!")
-                        return
-                    report_data = llm.report(db_freindly)
-                    await _post_to_channel(processed_channel, db_freindly, message, report_data)
+
+                    await _post_to_channel(processed_channel, db_friendly, message, report_data)
                 except Exception as e:
-                    await message.reply(f"Arey bapre bap! Processing mein gadbad ho gayi: {str(e)}\nBilkul Mehta Sahab ke calculations jaise!")
+                    await message.reply(f"ERROR: {str(e)}\n")
                     logger.error(f"Error processing attachment: {e}")
                     return None
 
     except discord.Forbidden as e:
         logger.error(f"Missing permissions: {e}")
-        await message.reply(f"Aye halo! Permission denied! Bilkul Sodhi ke shop jaise locked hai sab! Error: {str(e)}")
+        await message.reply(f"Permission denied! Error: {str(e)}")
     except discord.HTTPException as e:
         logger.error(f"HTTP error: {e}")
         await message.reply(f"Babuchak network! Champaklal ki walking speed se bhi slow hai! Error: {str(e)}")
@@ -133,9 +136,9 @@ class JobBot(discord.Client):
         intents.message_content = True
         super().__init__(
             intents=intents,
-            reconnect=True,  # Ensure automatic reconnection
-            max_retries=10,  # Maximum reconnection attempts
-            heartbeat_timeout=100  # Longer heartbeat timeout
+            reconnect=True,
+            max_retries=10,
+            heartbeat_timeout=100
         )
         self.db_config = db_config
         self.db_config = db_config
@@ -154,7 +157,6 @@ class JobBot(discord.Client):
 
 
 def main():
-    """Entry point with minimal complexity"""
     parser = argparse.ArgumentParser()
     parser.add_argument("--test", action="store_true", help="Run in test mode")
     args = parser.parse_args()

@@ -49,14 +49,10 @@ def not_none(value):
         return value
     raise ValueError(f"Value of {value} cannot be None")
 
-def add_job_to_db(job_data: dict, message_id: int, conn: psycopg2.extensions.connection):
+def add_job_to_db(db_friendly: dict, message_id: int, db_config: dict):
+    conn = psycopg2.connect(**db_config)
     cursor = conn.cursor()
     try:
-        logger.info("Adding job to database")
-
-        db_friendly = job_data.get("db_friendly", {})
-        if not isinstance(db_friendly, dict):
-            raise TypeError("Missing db_friendly data structure")
         logger.info(f"Adding LLMRESPONSE to DB: {json.dumps(db_friendly)}")
 
         # Type validation in one clean sweep
@@ -73,9 +69,9 @@ def add_job_to_db(job_data: dict, message_id: int, conn: psycopg2.extensions.con
             INSERT INTO job_applications (id, company_id, position_name, position_level, raw_json, location, remote_status) 
             VALUES (%s, %s, %s, %s, %s, %s, %s)
         """, (
-            message_id, company_id, position_data.get("name", ""), position_data.get("level"), json.dumps(job_data),
-            job_data.get("full_details", {}).get("metadata", {}).get("location", {}).get("primary"),
-            job_data.get("full_details", {}).get("metadata", {}).get("location", {}).get("remote"),
+            message_id, company_id, position_data.get("name", ""), position_data.get("level"), json.dumps(db_friendly),
+            db_friendly.get("full_details", {}).get("metadata", {}).get("location", {}).get("primary"),
+            db_friendly.get("full_details", {}).get("metadata", {}).get("location", {}).get("remote"),
         ))
 
         seen_skills = set()  # Our duplicate detector! ♂️
@@ -109,21 +105,6 @@ def add_job_to_db(job_data: dict, message_id: int, conn: psycopg2.extensions.con
         conn.rollback()
     finally:
         cursor.close()
-
-# TODO: this is redundant. merge it
-def process_job_posting(str_llm_content: str, message_id: int, db_config: dict)-> dict | None: 
-    conn = psycopg2.connect(**db_config)
-    try:
-        job_data = json.loads(str_llm_content)
-        add_job_to_db(job_data, message_id, conn)
-        logger.info("Job posting processed successfully")
-        return job_data.get("db_friendly", {})
-    except Exception as e:
-        logger.error(f"Error processing job posting: {e}")
-        logger.debug(f"Raw JSON content (first 200 chars): {str_llm_content[:200]}...")
-        conn.rollback()
-    finally:
-        conn.close()
 
 def if_processed(message_id: int, db_config: dict) -> bool:
     conn = psycopg2.connect(**db_config)
