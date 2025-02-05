@@ -17,11 +17,6 @@ CREATE TABLE IF NOT EXISTS job_applications (
     position_name TEXT NOT NULL,
     position_level INTEGER,  -- Changed from TEXT to INT
     raw_json JSONB,  -- Using JSONB for better performance and indexing
-    location TEXT,
-    remote_status BOOLEAN,
-    compensation_min INTEGER,
-    compensation_max INTEGER,
-    compensation_currency TEXT,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
@@ -43,6 +38,17 @@ CREATE INDEX IF NOT EXISTS idx_job_skills ON job_skills(job_id, skill_id);
 CREATE INDEX IF NOT EXISTS idx_must_have_skills ON job_skills(is_must_have);
 CREATE INDEX IF NOT EXISTS idx_job_level ON job_applications(position_level);
 CREATE INDEX IF NOT EXISTS idx_job_company ON job_applications(company_id);
+
+ALTER TABLE job_applications
+ADD COLUMN feedback JSONB;
+
+ALTER TABLE job_applications
+ADD COLUMN tailored_bullets JSONB;
+
+ALTER TABLE job_applications
+ADD COLUMN ats_score FLOAT;
+
+
 
 DO $$ BEGIN
     RAISE NOTICE '🚀 Database v2 initialized! Ready to wreak havoc on ATS systems!';

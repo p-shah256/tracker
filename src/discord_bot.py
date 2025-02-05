@@ -38,17 +38,29 @@ def _get_env_config(is_test: bool = False) -> dict:
     print(config)
     return config
 
-async def _post_to_channel(channel: discord.TextChannel, db_freindly: dict, message: discord.Message, report_data: dict) -> None:
-    position_name = db_freindly.get('position', {}).get('name', '')
-    company_name = db_freindly.get('company', '')
-    job_url = message.content[23:] or "URL missing!"
-    bullets = report_data.get('tailored_bullets', '')
-    match_before = report_data.get('initial_score', '')
-    match_after = report_data.get('optimized_score', '')
-    level = db_freindly.get('position', {}).get('level', {})
+async def _post_to_channel(channel_name: str, parsed_data: dict, tailored_data: dict, feedback_data: dict, message: discord.Message) -> None:
+    if message.guild is None:
+        logger.warning("Message is not in a guild, skipping")
+        return
+    channel = discord.utils.get(message.guild.text_channels, name=channel_name)
+    if not channel:
+        logger.info("Creating missing processed-jobs channel")
+        channel = await message.guild.create_text_channel('processed-jobs')
 
-    bullets_json = json.dumps(bullets, indent=4)
-    file_like = BytesIO(bullets_json.encode('utf-8'))
+    position_name = parsed_data.get('position', {}).get('name', '')
+    company_name = parsed_data.get('company', '')
+    job_url = message.content[23:] or "URL missing!"
+    level = parsed_data.get('position', {}).get('level', {})
+
+    critical_feedback = feedback_data.get('critical_feedback', '')
+    match_before = feedback_data.get('initial_score', '')
+
+    file = {
+        "critical_feedback": critical_feedback,
+        "bullet_points": tailored_data
+    }
+    file_json = json.dumps(file, indent=4)
+    file_like = BytesIO(file_json.encode('utf-8'))
     file = discord.File(file_like, filename="bullets.json")
 
     await channel.send(
@@ -56,8 +68,7 @@ async def _post_to_channel(channel: discord.TextChannel, db_freindly: dict, mess
         f"**Level:** {level}\n"
         f"**Company:** {company_name}\n"
         f"**URL:** {job_url}\n"
-        f"**Before Babita ji's Tips:** {match_before}\n"
-        f"**After Babita ji's Tips:** {match_after}\n\n",
+        f"**Inital Score:** {match_before}\n",
         file=file, 
     )
 
@@ -95,22 +106,27 @@ async def process_discord_job(message: discord.Message, db_config: dict) -> None
                     loop = asyncio.get_running_loop()
                     llm_parsed: str = await loop.run_in_executor(None, llm.parse_job_desc, file_path)
 
-                    job_data = json.loads(llm_parsed)
-                    db_friendly = job_data.get("db_friendly", {})
-                    if not isinstance(db_friendly, dict):
-                        raise TypeError("Missing db_friendly data structure")
-                    if not db_friendly:
+                    parsed_data_full = json.loads(llm_parsed)
+                    parsed_data_core = parsed_data_full.get("db_friendly", {})
+                    if not isinstance(parsed_data_full, dict):
+                        raise TypeError("Missing job_data data structure")
+                    if not parsed_data_core:
                         await message.reply("Could not parse the job description")
                         return
-                    db_process.add_job_to_db(db_friendly, message.id, db_config)
-                    report_data = llm.report(db_friendly)
 
-                    processed_channel = discord.utils.get(message.guild.text_channels, name='processed-jobs')
-                    if not processed_channel:
-                        logger.info("Creating missing processed-jobs channel")
-                        processed_channel = await message.guild.create_text_channel('processed-jobs')
+                    feedback_data = await loop.run_in_executor(None, llm.get_feedback, parsed_data_core)
+                    if not feedback_data:
+                        await message.reply("feedback is empty")
+                        return
 
-                    await _post_to_channel(processed_channel, db_friendly, message, report_data)
+                    tailor_data = await loop.run_in_executor(None, llm.get_tailored, feedback_data)
+                    if not tailor_data:
+                        await message.reply("tailored data is empty")
+                        return
+
+                    await loop.run_in_executor(None, db_process.add_job_to_db, parsed_data_full, feedback_data, tailor_data, message.id, db_config)
+
+                    await _post_to_channel(channel_name="processed-jobs", parsed_data=parsed_data_core, feedback_data=feedback_data, message=message, tailored_data=tailor_data)
                 except Exception as e:
                     await message.reply(f"ERROR: {str(e)}\n")
                     logger.error(f"Error processing attachment: {e}")

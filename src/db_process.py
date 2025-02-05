@@ -49,9 +49,11 @@ def not_none(value):
         return value
     raise ValueError(f"Value of {value} cannot be None")
 
-def add_job_to_db(db_friendly: dict, message_id: int, db_config: dict):
+def add_job_to_db(parsed_data: dict, feedback_data: dict, tailored_data: dict, message_id: int, db_config: dict) -> dict|None:
     conn = psycopg2.connect(**db_config)
     cursor = conn.cursor()
+
+    db_friendly = parsed_data.get("db_friendly", {})
     try:
         logger.info(f"Adding LLMRESPONSE to DB: {json.dumps(db_friendly)}")
 
@@ -66,15 +68,18 @@ def add_job_to_db(db_friendly: dict, message_id: int, db_config: dict):
         # Skills: Batch process with list comprehension magic
         position_data = db_friendly.get("position", {})
         cursor.execute("""
-            INSERT INTO job_applications (id, company_id, position_name, position_level, raw_json, location, remote_status) 
-            VALUES (%s, %s, %s, %s, %s, %s, %s)
+            INSERT INTO job_applications (id, company_id, position_name, position_level, raw_json, feedback, tailored_bullets, ats_score)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
         """, (
-            message_id, company_id, position_data.get("name", ""), position_data.get("level"), json.dumps(db_friendly),
-            db_friendly.get("full_details", {}).get("metadata", {}).get("location", {}).get("primary"),
-            db_friendly.get("full_details", {}).get("metadata", {}).get("location", {}).get("remote"),
+                       message_id, company_id,
+                       position_data.get("name", ""), position_data.get("level", ""), 
+                       json.dumps(parsed_data),
+                       json.dumps(feedback_data),
+                       json.dumps(tailored_data), 
+                       feedback_data.get("inital_score", 0)
         ))
 
-        seen_skills = set()  # Our duplicate detector! ♂️
+        seen_skills = set()  # Our duplicate detector!
         for skill in db_friendly.get("skills", []):
             skill_name = skill["name"].strip()
             if skill_name in seen_skills:
@@ -105,6 +110,7 @@ def add_job_to_db(db_friendly: dict, message_id: int, db_config: dict):
         conn.rollback()
     finally:
         cursor.close()
+        return db_friendly
 
 def if_processed(message_id: int, db_config: dict) -> bool:
     conn = psycopg2.connect(**db_config)

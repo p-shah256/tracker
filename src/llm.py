@@ -1,6 +1,7 @@
 import json
 import logging
 from pathlib import Path
+from typing import Any
 import cleaner
 from openai import OpenAI
 import os
@@ -18,10 +19,8 @@ client = OpenAI(
 
 def parse_job_desc(html_file_path: Path) -> str :
     try:
-        with Path('./src/config/json_struct.txt').open('r') as f:
-            json_struct = f.read()
-        with Path('./src/config/extraction_rules.txt').open('r') as f:
-            extraction_rules = f.read()
+        with Path('./src/config/1_parsing.txt').open('r') as f:
+            parsing_rules = f.read()
 
         with open(html_file_path, "r", encoding="utf-8") as file:
             html_content = file.read()
@@ -29,17 +28,10 @@ def parse_job_desc(html_file_path: Path) -> str :
         logger.info(f"Reduced HTML to RELEVANT CONTENT: {len(html_content)}->{len(relevant_content)}")
 
         prompt = (
-            "You are an elite ATS system reverse engineer with a PhD in Job Description Deconstruction™. "
-            "Your mission is to parse this HTML into structured data that would make even the pickiest type system happy. "
-            "Output ONLY valid JSON matching this structure (no explanations/text):\n\n"
-            f"{json_struct}\n\n"
-            f"{extraction_rules}\n\n"
+            f"{parsing_rules}\n\n"
             "Parse the following job description HTML, maintaining maximum detail while ensuring clean, normalized data:\n\n"
             f"{relevant_content}"
         )
-        logger.debug("===== PROMPT START =====")
-        logger.debug(prompt)
-        logger.debug("===== PROMPT END =====")
 
         try:
             response = client.chat.completions.create(
@@ -71,20 +63,19 @@ def parse_job_desc(html_file_path: Path) -> str :
         logger.error("Traceback details:\n" + traceback.format_exc())
         raise
 
-def report(db_freindly: dict) -> dict :
+def get_feedback(parsed_data: dict) -> dict :
     try:
-        with Path('./src/config/tailor_prompt.txt').open('r') as f:
-            tailor_prompt = f.read()
+        with Path('./src/config/2_feedback.txt').open('r') as f:
+            feedback_prompt = f.read()
         with Path('./src/config/resume.txt').open('r') as f:
             resume = f.read()
 
 
-        messages = [
-            {"role": "system", "content": tailor_prompt}, 
-            {"role": "user", "content": json.dumps({"job_description": db_freindly})},
+        messages :Any = [
+            {"role": "system", "content": feedback_prompt}, 
+            {"role": "user", "content": json.dumps({"parsed_job_desc": parsed_data})},
             {"role": "user", "content": resume},
         ]
-        logger.info("SENDING THIS PROMPT\n", messages)
 
         response = client.chat.completions.create(
             model="gemini-1.5-flash",
@@ -96,12 +87,49 @@ def report(db_freindly: dict) -> dict :
             logger.error("Error: No content received in the OpenAI API response")
             raise
         clean_response = cleaner.clean_llm_response(response.choices[0].message.content)
-        logger.info(clean_response)
-        report_data = json.loads(clean_response)
-        return report_data
+        feedback_data = json.loads(clean_response)
+        print("TAILORED_RESPONSE")
+        print(feedback_data)
+        return feedback_data
 
     except Exception as e:
         error_msg = f"Unexpected error occurred in report function: {e}"
         logger.error(error_msg)
         logger.error("Traceback details:\n" + traceback.format_exc())
         raise type(e)(f"{error_msg}\nOrigin: {traceback.format_exc()}") from e
+
+def get_tailored(feedback_data: dict) -> dict :
+    try:
+        with Path('./src/config/3_tailor.txt').open('r') as f:
+            tailor_prompt = f.read()
+        with Path('./src/config/resume.txt').open('r') as f:
+            resume = f.read()
+
+        messages: Any = [
+            {"role": "system", "content": tailor_prompt}, 
+            {"role": "user", "content": json.dumps({"feedback": feedback_data})},
+            {"role": "user", "content": resume},
+        ]
+
+        response = client.chat.completions.create(
+            model="gemini-1.5-flash",
+            n=1,
+            messages=messages,
+        )
+
+        if response.choices[0].message.content is None:
+            logger.error("Error: No content received in the OpenAI API response")
+            raise
+        clean_response = cleaner.clean_llm_response(response.choices[0].message.content)
+        tailored_data = json.loads(clean_response)
+        print("TAILORED_RESPONSE")
+        print(tailored_data)
+        return tailored_data
+
+    except Exception as e:
+        error_msg = f"Unexpected error occurred in tailoring LLM: {e}"
+        logger.error(error_msg)
+        logger.error("Traceback details:\n" + traceback.format_exc())
+        raise type(e)(f"{error_msg}\nOrigin: {traceback.format_exc()}") from e
+
+
