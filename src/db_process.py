@@ -8,42 +8,6 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 
-dummy_data = """{
-  "db_friendly": {
-    "company": "KAYAK",
-    "position": {
-      "name": "Java Backend Developer",
-      "level": "Mid"
-    },
-    "skills": [
-      {
-        "name": "Java",
-        "type": "technical",
-        "priority": 5,
-        "isMustHave": true,
-        "yearsRequired": null,
-        "context": "strong proficiency in Java and in-depth knowledge of data structures, concurrency, and OOP patterns"
-      },
-      {
-        "name": "Data Structures",
-        "type": "technical",
-        "priority": 4,
-        "isMustHave": true,
-        "yearsRequired": null,
-        "context": "in-depth knowledge of data structures"
-      },
-      {
-        "name": "Concurrency",
-        "type": "technical",
-        "priority": 4,
-        "isMustHave": true,
-        "yearsRequired": null,
-        "context": "in-depth knowledge of concurrency"
-      }
-    ]
-  }
-}"""
-
 def not_none(value):
     if value is not None:
         return value
@@ -76,7 +40,7 @@ def add_job_to_db(parsed_data: dict, feedback_data: dict, tailored_data: dict, m
                        json.dumps(parsed_data),
                        json.dumps(feedback_data),
                        json.dumps(tailored_data), 
-                       feedback_data.get("inital_score", 0)
+                       feedback_data.get("initial_score", 0)
         ))
 
         seen_skills = set()  # Our duplicate detector!
