@@ -35,7 +35,7 @@ def parse_job_desc(html_file_path: Path) -> str :
 
         try:
             response = client.chat.completions.create(
-                model="gemini-1.5-flash",
+                model="gemini-2.0-flash-lite",
                 n=1,
                 messages=[
                     {"role": "system", "content": "You are a helpful assistant."},
@@ -78,7 +78,7 @@ def get_feedback(parsed_data: dict) -> dict :
         ]
 
         response = client.chat.completions.create(
-            model="gemini-1.5-flash",
+            model="gemini-2.0-flash-lite",
             n=1,
             messages=messages,
         )
@@ -112,7 +112,7 @@ def get_tailored(feedback_data: dict) -> dict :
         ]
 
         response = client.chat.completions.create(
-            model="gemini-1.5-flash",
+            model="gemini-2.0-flash-lite",
             n=1,
             messages=messages,
         )
