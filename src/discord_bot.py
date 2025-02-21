@@ -119,10 +119,10 @@ async def process_discord_job(message: discord.Message, db_config: dict) -> None
                         await message.reply("feedback is empty")
                         return
 
-                    tailor_data = await loop.run_in_executor(None, llm.get_tailored, feedback_data)
-                    if not tailor_data:
-                        await message.reply("tailored data is empty")
-                        return
+                    # tailor_data = await loop.run_in_executor(None, llm.get_tailored, feedback_data)
+                    # if not tailor_data:
+                    #     await message.reply("tailored data is empty")
+                    #     return
 
                     await loop.run_in_executor(None, db_process.add_job_to_db, parsed_data_full, feedback_data, tailor_data, message.id, db_config)
 
