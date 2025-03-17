@@ -13,7 +13,7 @@ import (
 	"log/slog"
 
 	"github.com/bwmarrin/discordgo"
-	"github.com/shah256/tracker/pkg/types"
+	"github.com/p-shah256/tracker/pkg/types"
 )
 
 func InitLogger() {

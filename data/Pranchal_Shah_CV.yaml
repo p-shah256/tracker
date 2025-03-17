@@ -20,12 +20,12 @@ cv:
         highlights:
           - 'Relevant Coursework: Network Security, Kernel implementation, Computer Systems, Data Structures, Algorithms'
 
-      - institution: Sardar Patel University
-        area: Architectural Engineering
-        degree: BA
-        start_date: 2014-08
-        end_date: 2019-12
-        location: India
+      # - institution: Sardar Patel University
+      #   area: Architectural Engineering
+      #   degree: BA
+      #   start_date: 2014-08
+      #   end_date: 2019-12
+      #   location: India
 
     technical_skills:
       - "**Languages & Core Tech:** Go, C, Python, C++, Java, TypeScript, Linux, RESTful APIs, gRPC, GraphQL"

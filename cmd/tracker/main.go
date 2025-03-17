@@ -8,9 +8,11 @@ import (
 
 	"github.com/bwmarrin/discordgo"
 	"github.com/joho/godotenv"
+	"gopkg.in/yaml.v3"
 
-	"github.com/shah256/tracker/internal/helper"
-	"github.com/shah256/tracker/internal/llm"
+	"github.com/p-shah256/tracker/internal/helper"
+	"github.com/p-shah256/tracker/internal/llm"
+	"github.com/p-shah256/tracker/pkg/types"
 )
 
 var bot *discordgo.Session
@@ -80,34 +82,43 @@ func processJobPosting(s *discordgo.Session, m *discordgo.MessageCreate, url str
 	slog.Info("Downloaded file", "path", filePath)
 	defer os.Remove(filePath)
 
+	// ======================== parse job desc ========================
 	jobData, err := llm.ParseJobDesc(filePath)
 	if err != nil {
 		helper.HandleError(s, m, fmt.Errorf("job parsing failed: %w", err))
 		return
 	}
-	slog.Info("Parsed job description successfully")
+	slog.Info("Parsed job description successfully", 
+		"company", jobData.Company, 
+		"position", jobData.Position.Name, 
+		"skills_count", len(jobData.Skills))
 
+	// ======================== parse resume ========================
 	resumePath := "./data/Pranchal_Shah_CV.yaml"
 	resumeData, err := os.ReadFile(resumePath)
 	if err != nil {
 		helper.HandleError(s, m, fmt.Errorf("failed to read resume: %w", err))
 		return
 	}
-
-	// For now, we'll use a simple map structure for the resume
-	// In a real implementation, you'd parse the YAML properly
-	resume := map[string]any{
-		"sections": string(resumeData),
+	var resume types.Resume
+	err = yaml.Unmarshal(resumeData, &resume)
+	if err != nil {
+		helper.HandleError(s, m, fmt.Errorf("failed to parse resume YAML: %w", err))
+		return
 	}
-	slog.Info("Loaded resume", "path", resumePath)
-
-	tailoredData, err := llm.GetTailored(jobData, resume)
+	tailoredResume, err := llm.GetTailored(jobData, resume)
 	if err != nil {
 		helper.HandleError(s, m, fmt.Errorf("resume tailoring failed: %w", err))
 		return
 	}
+	slog.Debug("got tailored resume from gemini", "sections", len(tailoredResume.CV.Sections.TechnicalSkills))
+
+	message := fmt.Sprintf("✅ Resume tailored for %s position at %s\n\nSkills matched: %d\n", 
+		jobData.Position.Name, 
+		jobData.Company,
+		len(jobData.Skills))
 
 	s.MessageReactionRemove(m.ChannelID, m.ID, "⏳", s.State.User.ID)
 	s.MessageReactionAdd(m.ChannelID, m.ID, "✅")
-	s.ChannelMessageSend(m.ChannelID, tailoredData)
+	s.ChannelMessageSend(m.ChannelID, message)
 }
