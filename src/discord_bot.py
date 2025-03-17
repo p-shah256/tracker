@@ -1,4 +1,3 @@
-import json
 from pathlib import Path
 import asyncio
 import discord
@@ -69,4 +68,7 @@ async def process_job_posting(message):
         await message.add_reaction("❌")
         await message.reply(f"Error: {str(e)}")
 
-bot.run(os.getenv("DISCORD_BOT_TOKEN"))
+bot_token = os.getenv("DISCORD_BOT_TOKEN") 
+if bot_token is None:
+    pass
+bot.run(bot_token)
