@@ -12,14 +12,16 @@ RUN apt-get update && \
     ca-certificates \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
-RUN pip install --no-cache-dir rendercv
+RUN pip install --no-cache-dir rendercv[full]
+
 WORKDIR /app
 
 COPY --from=builder /app/tracker /app/tracker
 COPY ./configs ./configs
-COPY ./data ./data
 COPY .env .env
 
-RUN mkdir -p /app/data/output/rendercv
+RUN rendercv new --theme sb2nov "Pranchal_Shah"
+RUN rendercv render "Pranchal_Shah_CV.yaml"
+
 RUN chmod +x /app/tracker
 CMD ["/app/tracker"]

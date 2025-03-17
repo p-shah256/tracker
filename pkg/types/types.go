@@ -1,6 +1,9 @@
 package types
 
 // Resume represents the full resume structure from YAML
+// TODO: add all the types, get the whole resume in memory and then just replace whatever is returned by GPT
+
+// TODO: upgrade gemini model
 type Resume struct {
 	CV struct {
 		Sections struct {

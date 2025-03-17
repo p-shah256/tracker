@@ -18,7 +18,7 @@ import (
 
 func InitLogger() {
 	handler := slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{
-		Level: slog.LevelDebug,
+		Level: slog.LevelInfo,
 	})
 
 	logger := slog.New(handler)
@@ -50,7 +50,6 @@ func LoadResume(path string) (types.Resume, error) {
 }
 
 func DownloadFile(url, filename string) (string, error) {
-	log.Printf("Downloading file from: %s", url)
 
 	resp, err := http.Get(url)
 	if err != nil {

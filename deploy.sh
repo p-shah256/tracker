@@ -10,9 +10,6 @@ fi
 
 docker build -t tracker-app -f Dockerfile .
 
-echo "Build complete! You can run the application with:"
-echo "docker run -v $(pwd)/data/output:/app/data/output tracker-app"
-
 if [[ "$1" == "--run" ]]; then
     echo "Running tracker container..."
     docker run -v $(pwd)/data/output:/app/data/output tracker-app
