@@ -1,4 +1,4 @@
-package internal
+package cleaner
 
 import (
 	"strings"

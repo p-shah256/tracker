@@ -9,13 +9,14 @@ import (
 	"github.com/bwmarrin/discordgo"
 	"github.com/joho/godotenv"
 
-	"dbot/internal"
+	"github.com/shah256/tracker/internal/helper"
+	"github.com/shah256/tracker/internal/llm"
 )
 
 var bot *discordgo.Session
 
 func main() {
-	initLogger()
+	helper.InitLogger()
 	if err := godotenv.Load(); err != nil {
 		slog.Error("Error loading .env file", "error", err)
 	}
@@ -67,42 +68,42 @@ func processJobPosting(s *discordgo.Session, m *discordgo.MessageCreate, url str
 	s.MessageReactionAdd(m.ChannelID, m.ID, "⏳")
 
 	if err := os.MkdirAll("temp", 0755); err != nil {
-		handleError(s, m, fmt.Errorf("failed to create temp directory: %w", err))
+		helper.HandleError(s, m, fmt.Errorf("failed to create temp directory: %w", err))
 		return
 	}
 
-	filePath, err := downloadFile(url, "temp")
+	filePath, err := helper.DownloadFile(url, "temp")
 	if err != nil {
-		handleError(s, m, err)
+		helper.HandleError(s, m, err)
 		return
 	}
 	slog.Info("Downloaded file", "path", filePath)
 	defer os.Remove(filePath)
 
-	jobData, err := internal.ParseJobDesc(filePath)
+	jobData, err := llm.ParseJobDesc(filePath)
 	if err != nil {
-		handleError(s, m, fmt.Errorf("job parsing failed: %w", err))
+		helper.HandleError(s, m, fmt.Errorf("job parsing failed: %w", err))
 		return
 	}
 	slog.Info("Parsed job description successfully")
 
-	resumePath := "./Pranchal_Shah_CV.yaml"
+	resumePath := "./data/Pranchal_Shah_CV.yaml"
 	resumeData, err := os.ReadFile(resumePath)
 	if err != nil {
-		handleError(s, m, fmt.Errorf("failed to read resume: %w", err))
+		helper.HandleError(s, m, fmt.Errorf("failed to read resume: %w", err))
 		return
 	}
 
 	// For now, we'll use a simple map structure for the resume
 	// In a real implementation, you'd parse the YAML properly
-	resume := map[string]interface{}{
-		"sections": resumeData,
+	resume := map[string]any{
+		"sections": string(resumeData),
 	}
 	slog.Info("Loaded resume", "path", resumePath)
 
-	tailoredData, err := internal.GetTailored(jobData, resume)
+	tailoredData, err := llm.GetTailored(jobData, resume)
 	if err != nil {
-		handleError(s, m, fmt.Errorf("resume tailoring failed: %w", err))
+		helper.HandleError(s, m, fmt.Errorf("resume tailoring failed: %w", err))
 		return
 	}
 

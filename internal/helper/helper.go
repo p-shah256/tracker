@@ -1,4 +1,4 @@
-package main
+package helper
 
 import (
 	"errors"
@@ -13,9 +13,10 @@ import (
 	"log/slog"
 
 	"github.com/bwmarrin/discordgo"
+	"github.com/shah256/tracker/pkg/types"
 )
 
-func initLogger() {
+func InitLogger() {
 	handler := slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{
 		Level: slog.LevelDebug,
 	})
@@ -24,9 +25,9 @@ func initLogger() {
 	slog.SetDefault(logger)
 }
 
-func loadResume(path string) (Resume, error) {
+func LoadResume(path string) (types.Resume, error) {
 	log.Printf("Loading resume from: %s", path)
-	var resume Resume
+	var resume types.Resume
 	file, err := os.Open(path)
 	if err != nil {
 		return resume, fmt.Errorf("resume file not found at %s", path)
@@ -48,7 +49,7 @@ func loadResume(path string) (Resume, error) {
 	return resume, nil
 }
 
-func downloadFile(url, filename string) (string, error) {
+func DownloadFile(url, filename string) (string, error) {
 	log.Printf("Downloading file from: %s", url)
 
 	resp, err := http.Get(url)
@@ -77,7 +78,7 @@ func downloadFile(url, filename string) (string, error) {
 	return filePath, nil
 }
 
-func handleError(s *discordgo.Session, m *discordgo.MessageCreate, err error) {
+func HandleError(s *discordgo.Session, m *discordgo.MessageCreate, err error) {
 	slog.Error("Processing error", "error", err)
 	s.MessageReactionRemove(m.ChannelID, m.ID, "⏳", s.State.User.ID)
 	s.MessageReactionAdd(m.ChannelID, m.ID, "❌")
