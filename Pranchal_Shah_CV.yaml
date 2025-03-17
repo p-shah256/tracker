@@ -27,14 +27,13 @@ cv:
         end_date: 2019-12
         location: India
 
-    technical skills:
+    technical_skills:
       - "**Languages & Core Tech:** Go, C, Python, C++, Java, TypeScript, Linux, RESTful APIs, gRPC, GraphQL"
       - "**Web & Database:** Node.js, Django, Express, PostgreSQL, MongoDB, Redis, Elasticsearch, Kafka, MySQL"
       - "**Cloud & DevOps:** AWS (S3, Lambda, SQS, EC2), GCP, Kubernetes, Docker, Terraform, CI/CD, Microservices"
       - "**Tools & Observability:** Git, Jenkins, Prometheus, Grafana, DataDog, GitHub Actions, OAuth/OIDC, WebSockets"
 
-
-    professional experience:
+    professional_experience:
       - company: FoxyAI
         position: Backend Engineer Intern
         start_date: 2024-05
@@ -68,7 +67,7 @@ cv:
           - "Migrated Python services into microservice, added health checks resulting in 65% reduction in fault tolerance"
           - "Optimized MySQL queries implementing database partitioning and indexes, reducing latency from 250ms to 40ms"
 
-    open_source contributions:
+    open_source_contributions:
       - name: 'Kubernetes (Issue: [120633](https://github.com/kubernetes/kubernetes/issues/120633), PRs: [129574](https://github.com/kubernetes/kubernetes/pull/129574) [34444](https://github.com/kubernetes/test-infra/pull/34444) [34306](https://github.com/kubernetes/test-infra/pull/34306)) | Go, Docker, Ginkgo'
         start_date: 2025-01
         end_date: 2025-03
