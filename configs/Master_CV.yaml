@@ -1,0 +1,244 @@
+cv:
+  name: Pranchal Shah
+  location: Boston
+  email: pranchal030@gmail.com
+  phone: +1-681-242-7542
+  website:
+  social_networks:
+    - network: LinkedIn
+      username: pranchals
+    - network: GitHub
+      username: p-shah256
+  sections:
+    education:
+      - institution: Northeastern University
+        area: Computer Science (3.92 GPA)
+        degree: MS
+        start_date: 2023-01
+        end_date: 2025-05
+        location: Boston, MA, USA
+        highlights:
+          - 'Relevant Coursework: Network Security, Kernel implementation, Computer Systems, Data Structures, Algorithms'
+
+      # - institution: Sardar Patel University
+      #   area: Architectural Engineering
+      #   degree: BA
+      #   start_date: 2014-08
+      #   end_date: 2019-12
+      #   location: India
+
+    technical_skills:
+      - "**Languages & Core Tech:** Go, C, Python, C++, Java, TypeScript, Linux, RESTful APIs, gRPC, GraphQL"
+      - "**Web & Database:** Node.js, Django, Express, PostgreSQL, MongoDB, Redis, Elasticsearch, Kafka, MySQL"
+      - "**Cloud & DevOps:** AWS (S3, Lambda, SQS, EC2), GCP, Kubernetes, Docker, Terraform, CI/CD, Microservices"
+      - "**Tools & Observability:** Git, Jenkins, Prometheus, Grafana, DataDog, GitHub Actions, OAuth/OIDC, WebSockets"
+
+    professional_experience:
+      - company: FoxyAI
+        position: Backend Engineer Intern
+        start_date: 2024-05
+        end_date: 2024-12
+        location: Boston, MA, USA
+        highlights:
+          - "Engineered a high-throughput image processing pipeline using Docker and Golang microservices. Reduced processing time by 73% (from 10:37 to 2:53 mins) with batching items on message queues while handling 12M+ daily images"
+          - "Improved ML inference by 12% using NVIDIA MPS scheduling on Kubernetes A100 clusters running 17 ML models"
+          - "Implemented cross-cloud cache with Typescript (AWS/GCP) reducing costs by 35%, processing 90M+ images weekly"
+          - "Produced serverless testing infrastructure using AWS (S3, Lambda, DynamoDB) achieving 65% faster test execution"
+          - "Developed AWS SQS and PostgreSQL-based audit trail system handling 3000 QPS with 3ms  latency across services"
+  
+      - company: Sangath LLP
+        position: Computational Engineer
+        start_date: 2020-12
+        end_date: 2022-07
+        location: Ahmedabad, India
+        highlights:
+          - "Produced extensible C# plugin framework reducing simulation time by 33% across multiple  manufacturing workloads"
+          - "Led cross-functional team of 4 engineers to architect complex computational modeling framework, solving critical manufacturing bottlenecks, debugged simulation errors reducing iteration by 33% and delivering $800K savings"
+          - "Automated Python workflows across 20+ projects, reducing 40-hour processes to 15-min computations of estimates"
+
+      - company: Excellence Corporation
+        position: Devops and Backend Engineer
+        start_date: 2019-12
+        end_date: 2020-12
+        location: Mumbai, India
+        highlights:
+          - "Developed Kafka event processing architecture handling 10K+ events/min across distributed Linux EC2 workloads"
+          - "Built RESTful API gateway for service discovery with OAuth2.0 auth, processing 15K+ daily requests at sub-30ms"
+          - "Migrated Python services into microservice, added health checks resulting in 65% reduction in fault tolerance"
+          - "Optimized MySQL queries implementing database partitioning and indexes, reducing latency from 250ms to 40ms"
+
+    open_source_contributions:
+      - name: 'Kubernetes (Issue: [120633](https://github.com/kubernetes/kubernetes/issues/120633), PRs: [129574](https://github.com/kubernetes/kubernetes/pull/129574) [34444](https://github.com/kubernetes/test-infra/pull/34444) [34306](https://github.com/kubernetes/test-infra/pull/34306)) | Go, Docker, Ginkgo'
+        start_date: 2025-01
+        end_date: 2025-03
+        highlights:
+          - "Crafted disk pressure simulation framework for node testing, collaborating with Red Hat and Google maintainers"
+          - "Enhanced test suites validating container eviction under resource constraints, ensuring eviction ordering priority"
+          - "Built automated test environments for storage isolation, image garbage collection, and volume-specific eviction"
+        
+    projects:
+      - name: 'Bare Metal RISC-V Operating System | [GitHub](https://github.com/p-shah256/systems-projects) | C, Assembly, Systems'
+        start_date: 2024-09
+        end_date: 2024-12
+        highlights:
+          - "Architected a preemptive MLFQ scheduler with dynamic priority, achieving 73% lower shell latency"
+          - "Created 16-bit CPU emulator supporting 20+ instructions with 64KB virtual memory and 8 registers management"
+          - "Engineered threading library with custom scheduler and 120ns context switching supporting 1000+ parallel threads"
+          - "Programmed a POSIX shell supporting 10+ pipes with I/O redirection and comprehensive bash feature compatibility"
+
+      - name: 'Self-Hosted Infrastructure | Docker, Prometheus, Grafana, Nginx'
+        start_date: 2024-01
+        end_date: 2024-12
+        highlights:
+          - "Built production-grade infrastructure hosting blog, git, and social forum serving 10K+ weekly active users"
+          - "Implemented Prometheus and Grafana observability stack monitoring 1000+ daily requests with 100ms p95 latency"
+
+      - name: 'Secure Messaging Protocol | [GitHub](https://github.com/p-shah256/6740-labs/tree/main/secure-messaging) | Python, OpenSSL, TCP/IP'
+        start_date: 2024-03
+        end_date: 2024-04
+        highlights:
+          - "Created secure session management with TLS-like handshake while achieving less than 50ms for establishment"
+          - "Designed custom end-to-end encrypted messaging protocol with perfect forward secrecy handling 100+ msg/second"
+
+    
+design:
+  theme: sb2nov
+  page:
+    size: us-letter
+    top_margin: 1.5cm
+    bottom_margin: 1.5cm
+    left_margin: 1.5cm
+    right_margin: 1.5cm
+    show_page_numbering: false
+    show_last_updated_date: false
+  colors:
+    text: rgb(0, 0, 0)
+    name: rgb(0, 0, 0)
+    connections: rgb(0, 0, 0)
+    section_titles: rgb(0, 0, 0)
+    links: rgb(0, 79, 144)
+    last_updated_date_and_page_numbering: rgb(128, 128, 128)
+  text:
+    font_family: New Computer Modern
+    font_size: 10pt
+    leading: 0.5em
+    alignment: left
+    date_and_location_column_alignment: right
+  links:
+    underline: true
+    use_external_link_icon: false
+  header:
+    name_font_family: New Computer Modern
+    name_font_size: 20pt
+    name_bold: true
+    # small_caps_for_name: false
+    photo_width: 3.5cm
+    vertical_space_between_name_and_connections: 0.2cm
+    vertical_space_between_connections_and_first_section: 0.3cm
+    horizontal_space_between_connections: 0.5cm
+    connections_font_family: New Computer Modern
+    separator_between_connections: ''
+    use_icons_for_connections: true
+    # use_urls_as_placeholders_for_connections: false
+    # make_connections_links: true
+    alignment: center
+  section_titles:
+    type: with-full-line
+    font_family: New Computer Modern
+    font_size: 1.2em
+    bold: true
+    small_caps: true
+    line_thickness: 0.5pt
+    vertical_space_above: 0.4cm
+    vertical_space_below: 0.15cm
+  entries:
+    date_and_location_width: 4.15cm
+    left_and_right_margin: 0cm
+    horizontal_space_between_columns: 0.1cm
+    vertical_space_between_entries: 0.7em
+    allow_page_break_in_sections: false
+    allow_page_break_in_entries: false
+    short_second_row: false
+    show_time_spans_in: []
+  highlights:
+    bullet: ◦
+    # nested_bullet: '-'
+    top_margin: 0.2cm
+    left_margin: 0cm
+    vertical_space_between_highlights: 0.2cm
+    horizontal_space_between_bullet_and_highlight: 0.2em
+    summary_left_margin: 0cm
+  entry_types:
+    one_line_entry:
+      template: '**LABEL:** DETAILS' 
+    education_entry:
+      main_column_first_row_template: |-
+        **INSTITUTION**
+        *DEGREE in AREA*
+      degree_column_template:
+      degree_column_width: 1cm
+      main_column_second_row_template: |-
+        SUMMARY
+        HIGHLIGHTS
+      date_and_location_column_template: |-
+        *LOCATION*
+        *DATE*
+    normal_entry:
+      main_column_first_row_template: '**NAME**'
+      main_column_second_row_template: |-
+        SUMMARY
+        HIGHLIGHTS
+      date_and_location_column_template: |-
+        *LOCATION*
+        *DATE*
+    experience_entry:
+      main_column_first_row_template: |-
+        **POSITION**
+        *COMPANY*
+      main_column_second_row_template: |-
+        SUMMARY
+        HIGHLIGHTS
+      date_and_location_column_template: |-
+        *LOCATION*
+        *DATE*
+locale:
+  language: en
+  phone_number_format: national
+  page_numbering_template: NAME - Page PAGE_NUMBER of TOTAL_PAGES
+  last_updated_date_template: Last updated in TODAY
+  date_template: MONTH_ABBREVIATION YEAR
+  month: month
+  months: months
+  year: year
+  years: years
+  present: present
+  to: –
+  abbreviations_for_months:
+    - Jan
+    - Feb
+    - Mar
+    - Apr
+    - May
+    - June
+    - July
+    - Aug
+    - Sept
+    - Oct
+    - Nov
+    - Dec
+  full_names_of_months:
+    - January
+    - February
+    - March
+    - April
+    - May
+    - June
+    - July
+    - August
+    - September
+    - October
+    - November
+    - December
+rendercv_settings:
+  date: '2025-03-01'
+  bold_keywords: []

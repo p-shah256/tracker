@@ -1,43 +1,24 @@
-You are YAML-Whisperer X-TREME, a next-gen resume optimization engine created by top tech recruiters who've hacked the hiring systems at FAANG.
+I need an ATS-optimized resume tailored for this job. Response MUST be valid YAML using snake_case fields.
 
-INPUT:
-1. Original resume YAML
-2. Job description analysis JSON 
+JOB DATA: %s
 
-OUTPUT:
-Aggressively tailored resume YAML that perfectly aligns with the job requirements while maintaining plausible deniability.
+RESUME SECTIONS: %s
 
 OPTIMIZATION RULES:
-1. Keyword Injection: Go nuclear with keywords - embed EVERY must-have skill from the job description multiple times throughout the resume.
+1. SURGICALLY insert JD keywords into EXISTING technical achievements - don't add fluff
+2. Every bullet MUST contain quantifiable metrics (maintain the original numbers)
+3. Keep each bullet CONCISE and FOCUSED - no tacking on generic skill statements
+4. DO NOT mention soft skills like "quick learner" or "interpersonal" directly - show them through achievements
+5. Keywords should appear natural in context, NOT forced or stuffed
 
-2. Experience Transformation:
-   - Reinterpret existing experiences through the lens of the target role
-   - For technical experiences, add relevant domain knowledge (healthcare, AI, etc.)
-   - If candidate has ANY experience with ML, massively amplify it
-   - Reframe generic engineering accomplishments as domain-specific wins
+FORMAT REQUIREMENTS:
+- ALL strings with special chars (like **) MUST use double quotes
+- Example: technical_skills: ["**Languages:** Python, C++"]
 
-3. Priority Skills Highlighting:
-   - For each skill with priority 4-5, ensure it appears in MULTIPLE experiences
-   - For any "isMustHave: true" skills, ensure they appear at least 3 times
+BAD EXAMPLE:
+Original: "Engineered image processing pipeline using Docker reducing time by 73%"
+Bad: "Engineered image processing pipeline using Docker reducing time by 73%, showcasing computer science and networking skills and demonstrating quick learner capabilities"
 
-4. Gap Obliteration:
-   - Identify ALL missing must-have skills
-   - Aggressively reinterpret past experiences to showcase these skills
-   - Use domain-specific jargon to suggest deeper knowledge than explicitly stated
-
-5. Achievement Amplification:
-   - Maintain existing metrics but recontextualize them for relevance
-   - Add domain impact where plausible (e.g., "saving $X in healthcare costs")
-   - Connect technical achievements to business outcomes valued in target industry
-
-6. Strategic Reordering:
-   - Sort all skills and experiences to front-load exact keyword matches
-   - Create logical narrative that builds toward target role
-
-7. Boundary-Pushing Guidelines:
-   - Stay within the realm of plausibility but MAXIMIZE alignment
-   - Never fabricate companies or timeframes
-   - Feel free to reinterpret project scopes and impacts
-   - Assume transferable skills can be presented as direct experience
-
-Return only the modified YAML with no explanations or comments.
+GOOD EXAMPLE: 
+Original: "Engineered image processing pipeline using Docker reducing time by 73%"
+Good: "Engineered TCP/IP-optimized image processing pipeline using Docker and Linux microservices reducing processing time by 73% across distributed networks"

@@ -19,7 +19,7 @@ import (
 
 var clean = cleaner.NewCleaner()
 
-func ParseJobDesc(htmlFilePath string) (*types.JdJson, error) {
+func ParseJD(htmlFilePath string) (*types.JdJson, error) {
 	parsingRulesPath := filepath.Join(".", "configs", "prompts", "1_parsing.txt")
 	parsingRules, err := os.ReadFile(parsingRulesPath)
 	if err != nil {
@@ -59,7 +59,7 @@ func ParseJobDesc(htmlFilePath string) (*types.JdJson, error) {
 		return nil, fmt.Errorf("failed to parse LLM response as JSON: %w", err)
 	}
 
-	slog.Debug("Response received and cleaned", "parsedData", response.DBFriendly)
+	slog.Info("Response received and cleaned", "parsedData", response.DBFriendly)
 	return &response.DBFriendly, nil
 }
 
@@ -69,41 +69,16 @@ func GetTailored(dbFriendly *types.JdJson, resume types.Resume) (*types.Resume, 
 	if err != nil {
 		return nil, fmt.Errorf("failed to read tailor prompt: %w", err)
 	}
-
 	dbFriendlyJSON, err := json.Marshal(dbFriendly)
 	if err != nil {
 		return nil, fmt.Errorf("failed to marshal job data: %w", err)
 	}
-
 	resumeJSON, err := json.Marshal(resume)
 	if err != nil {
 		return nil, fmt.Errorf("failed to marshal resume data: %w", err)
 	}
 
-	userMessage := fmt.Sprintf(
-		"I need a weaponized resume for a job. Here's the job data and resume segments:\n\n"+
-			"JOB DATA: %s\n\n"+
-			"RESUME SECTIONS: %s\n\n"+
-
-			"OPTIMIZATION RULES:\n"+
-			"1. Keep the length(chars) of each item exactly the same\n"+
-			"2. Every bullet MUST contain a quantifiable metric (numbers, percentages, scale)\n"+
-			"3. Front-load each bullet with technical achievement, not soft skills\n"+
-			"4. Mirror exact terminology from job description where relevant\n"+
-			"5. Ruthlessly eliminate any language not demonstrating technical capability\n"+
-			"6. Prioritize recent work that shows scale and complexity\n"+
-			"7. Each bullet must contain at least 2 technical keywords\n"+
-			"8. Replace vague verbs ('worked on', 'helped with') with ownership verbs ('engineered', 'architected')\n\n"+
-
-			"Please tailor the resume based on these optimization rules. IMPORTANT: Your response MUST be valid YAML. Make sure all strings containing special characters like asterisks (**) are enclosed in double quotes. For example, instead of:\n"+
-			"technical_skills:\n"+
-			"  - **Languages & Core Tech:** Java, Spring\n\n"+
-			"Use:\n"+
-			"technical_skills:\n"+
-			"  - \"**Languages & Core Tech:** Java, Spring\"\n\n"+
-			"This is critical for parsing your response correctly. Remember to use snake_case for field names.",
-		string(dbFriendlyJSON), string(resumeJSON))
-
+	userMessage := fmt.Sprintf(string(tailorPrompt), string(dbFriendlyJSON), string(resumeJSON))
 	slog.Debug("GET TAILORED, sending this to Gemini:", "userMessage", userMessage)
 
 	content, err := callGeminiAPI(string(tailorPrompt), userMessage)
@@ -137,7 +112,7 @@ func callGeminiAPI(systemPrompt, userPrompt string) (string, error) {
 	}
 	defer client.Close()
 
-	model := client.GenerativeModel("gemini-1.5-flash")
+	model := client.GenerativeModel("gemini-2.0-flash")
 	if systemPrompt != "" {
 		model.SystemInstruction = &genai.Content{
 			Parts: []genai.Part{genai.Text(systemPrompt)},

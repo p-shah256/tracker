@@ -3,15 +3,13 @@ package types
 // Resume represents the full resume structure from YAML
 // TODO: 1. only edit sangath, excellence and technical skills
 
-// TODO: upgrade gemini model
-
 type Resume struct {
 	CV struct {
 		Sections struct {
 			TechnicalSkills         []string           `yaml:"technical_skills"`
 			ProfessionalExperience  []ExperienceItem   `yaml:"professional_experience"`
 			Projects                []ProjectItem      `yaml:"projects"`
-			OpenSourceContributions []ContributionItem `yaml:"open_source_contributions"`
+			// OpenSourceContributions []ContributionItem `yaml:"open_source_contributions"`
 		} `yaml:"sections"`
 	} `yaml:"cv"`
 }
