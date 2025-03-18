@@ -84,72 +84,19 @@ func processJobPosting(s *discordgo.Session, m *discordgo.MessageCreate, url str
 	defer os.Remove(filePath)
 
 	// ======================== parse job desc ========================
-	jobData, err := llm.ParseJobDesc(filePath)
+	jd_json, err := llm.ParseJobDesc(filePath)
 	if err != nil {
 		helper.HandleError(s, m, fmt.Errorf("job parsing failed: %w", err))
 		return
 	}
 	slog.Info("Parsed job description successfully",
-		"company", jobData.Company,
-		"position", jobData.Position.Name,
-		"skills_count", len(jobData.Skills))
+		"company", jd_json.Company,
+		"position", jd_json.Position.Name,
+		"skills_count", len(jd_json.Skills))
 
 	// ======================== parse resume ========================
-	cvPath := "./configs/" + os.Getenv("USER_NAME") + "_CV.yaml"
-	resumeData, err := os.ReadFile(cvPath)
-	if err != nil {
-		helper.HandleError(s, m, fmt.Errorf("failed to read resume: %w", err))
-		return
-	}
-
-	var resume types.Resume
-	err = yaml.Unmarshal(resumeData, &resume)
-	if err != nil {
-		helper.HandleError(s, m, fmt.Errorf("failed to parse resume YAML: %w", err))
-		return
-	}
-
-	tailoredResume, err := llm.GetTailored(jobData, resume)
-	if err != nil {
-		helper.HandleError(s, m, fmt.Errorf("resume tailoring failed: %w", err))
-		return
-	}
-
-	slog.Debug("got tailored resume from gemini", "sections", len(tailoredResume.CV.Sections.TechnicalSkills))
-
-	// ======================== render tailored CV ========================
-	// 1. Convert tailored resume to YAML
-	tailoredResumeYAML, err := yaml.Marshal(tailoredResume)
-	if err != nil {
-		helper.HandleError(s, m, fmt.Errorf("failed to convert tailored resume to YAML: %w", err))
-		return
-	}
-
-	// 2. Render it with RenderCV
-	pdfPath, err := rendercv.RenderTailoredResume(
-		tailoredResumeYAML,
-		jobData.Company,
-		jobData.Position.Name,
-	)
-	if err != nil {
-		helper.HandleError(s, m, fmt.Errorf("failed to render tailored resume: %w", err))
-		return
-	}
-
-	// 3. Form the response message
-	message := fmt.Sprintf("✅ Resume tailored for %s position at %s\n\nSkills matched: %d\n",
-		jobData.Position.Name,
-		jobData.Company,
-		len(jobData.Skills))
-
-	// 4. Send the message and PDF
-	s.MessageReactionRemove(m.ChannelID, m.ID, "⏳", s.State.User.ID)
-	s.MessageReactionAdd(m.ChannelID, m.ID, "✅")
-
-	// Send the text message
-	s.ChannelMessageSend(m.ChannelID, message)
-
-	// Send the PDF file
+	cvPath := "./configs/" + "Master_CV.yaml"
+	pdfPath, err := PartiallyTailorResume(jd_json, cvPath)
 	pdfFile, err := os.Open(pdfPath)
 	if err != nil {
 		helper.HandleError(s, m, fmt.Errorf("failed to open PDF file: %w", err))
@@ -162,4 +109,54 @@ func processJobPosting(s *discordgo.Session, m *discordgo.MessageCreate, url str
 		helper.HandleError(s, m, fmt.Errorf("failed to send PDF file: %w", err))
 		return
 	}
+}
+
+// parses resume
+// gets tailored
+// replaces and marshalls it
+// renders tailored resume and returns path
+func PartiallyTailorResume(jdJson *types.JdJson, cvPath string) (string, error) {
+	resumeData, err := os.ReadFile(cvPath)
+	if err != nil {
+		return "", fmt.Errorf("failed to read resume: %w", err)
+	}
+	var fullResumeMap map[string]any
+	if err = yaml.Unmarshal(resumeData, &fullResumeMap); err != nil {
+		return "", fmt.Errorf("failed to parse full resume YAML: %w", err)
+	}
+
+	var partialResume types.Resume
+	if err = yaml.Unmarshal(resumeData, &partialResume); err != nil {
+		return "", fmt.Errorf("failed to parse partial resume YAML: %w", err)
+	}
+
+	tailoredPartial, err := llm.GetTailored(jdJson, partialResume)
+	if err != nil {
+		return "", fmt.Errorf("resume tailoring failed: %w", err)
+	}
+
+	fullResumeMap["cv"].(map[string]any)["sections"].(map[string]any)["technical_skills"] =
+		tailoredPartial.CV.Sections.TechnicalSkills
+	fullResumeMap["cv"].(map[string]any)["sections"].(map[string]any)["professional_experience"] =
+		tailoredPartial.CV.Sections.ProfessionalExperience
+	fullResumeMap["cv"].(map[string]any)["sections"].(map[string]any)["projects"] =
+		tailoredPartial.CV.Sections.Projects
+	fullResumeMap["cv"].(map[string]any)["sections"].(map[string]any)["open_source_contributions"] =
+		tailoredPartial.CV.Sections.OpenSourceContributions
+
+	updatedYAML, err := yaml.Marshal(fullResumeMap)
+	if err != nil {
+		return "", fmt.Errorf("failed to convert updated resume to YAML: %w", err)
+	}
+
+	pdfPath, err := rendercv.RenderTailoredResume(
+		updatedYAML,
+		jdJson.Company,
+		jdJson.Position.Name,
+	)
+	if err != nil {
+		return "", fmt.Errorf("failed to render tailored resume: %w", err)
+	}
+
+	return pdfPath, nil
 }

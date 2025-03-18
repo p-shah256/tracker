@@ -12,5 +12,5 @@ docker build -t tracker-app -f Dockerfile .
 
 if [[ "$1" == "--run" ]]; then
     echo "Running tracker container..."
-    docker run -v $(pwd)/data/output:/app/data/output tracker-app
+    docker run tracker-app
 fi

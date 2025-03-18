@@ -19,7 +19,7 @@ import (
 
 var clean = cleaner.NewCleaner()
 
-func ParseJobDesc(htmlFilePath string) (*types.DBFriendly, error) {
+func ParseJobDesc(htmlFilePath string) (*types.JdJson, error) {
 	parsingRulesPath := filepath.Join(".", "configs", "prompts", "1_parsing.txt")
 	parsingRules, err := os.ReadFile(parsingRulesPath)
 	if err != nil {
@@ -49,7 +49,7 @@ func ParseJobDesc(htmlFilePath string) (*types.DBFriendly, error) {
 	cleanResponse := clean.CleanLlmResponse(content)
 
 	var response struct {
-		DBFriendly types.DBFriendly `json:"db_friendly"`
+		DBFriendly types.JdJson `json:"db_friendly"`
 	}
 
 	if err := json.Unmarshal([]byte(cleanResponse), &response); err != nil {
@@ -63,7 +63,7 @@ func ParseJobDesc(htmlFilePath string) (*types.DBFriendly, error) {
 	return &response.DBFriendly, nil
 }
 
-func GetTailored(dbFriendly *types.DBFriendly, resume types.Resume) (*types.Resume, error) {
+func GetTailored(dbFriendly *types.JdJson, resume types.Resume) (*types.Resume, error) {
 	tailorPath := filepath.Join(".", "configs", "prompts", "3_tailor.txt")
 	tailorPrompt, err := os.ReadFile(tailorPath)
 	if err != nil {

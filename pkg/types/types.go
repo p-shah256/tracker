@@ -1,9 +1,10 @@
 package types
 
 // Resume represents the full resume structure from YAML
-// TODO: add all the types, get the whole resume in memory and then just replace whatever is returned by GPT
+// TODO: 1. only edit sangath, excellence and technical skills
 
 // TODO: upgrade gemini model
+
 type Resume struct {
 	CV struct {
 		Sections struct {
@@ -57,8 +58,8 @@ type Position struct {
 	Level int    `json:"level"` // years of experience
 }
 
-// DBFriendly represents the structured job description data
-type DBFriendly struct {
+// JdJson represents the structured job description data
+type JdJson struct {
 	Company  string   `json:"company"`
 	Position Position `json:"position"`
 	Skills   []Skill  `json:"skills"`
