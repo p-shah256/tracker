@@ -20,24 +20,29 @@ func (l *LLM) ExtractSkills(jobDescContent string) (*types.ExtractedSkills, erro
 	relevantContent := clean.CleanHTML(jobDescContent)
 	logger.Debug("cleaned HTML content", "original_length", len(jobDescContent), "cleaned_length", len(relevantContent))
 
-	prompt := `Extract every technical skill, tool, platform, methodology, and metric mentioned in this job description. 
-    Format as a prioritized list with required skills first, nice-to-have second.
-    Return the result as a JSON object with the following structure:
-    {
-      "required_skills": [
-        {"name": "skill name", "context": "original text from job description"}
-      ],
-      "nice_to_have_skills": [
-        {"name": "skill name", "context": "original text from job description"}
-      ],
-      "company_info": {
-        "name": "company name if mentioned",
-        "position": "job title",
-        "level": "seniority level if mentioned"
-      }
-    }
-    Job Description:
-    ` + relevantContent
+	prompt := `Analyze this job description as if you were a professional resume writer identifying EVERY POSSIBLE keyword that could be used to match a candidate to this role. Extract:
+		1. Technical skills (explicit AND implied from job duties)
+		2. Software/tools mentioned
+		3. Methodologies/processes described
+		4. Soft skills required
+		5. Industry-specific terminology
+		6. Domain knowledge areas
+		7. Responsibilities that imply specific skills
+		Be THOROUGH and AGGRESSIVE in your extraction - don't just look for explicit "skill" words, but identify ALL competencies someone would need to do this job well.
+		Format as a prioritized JSON with:
+		{
+		  "required_skills": [
+			{"name": "skill", "context": "exact text where this skill was mentioned or implied", "importance": 1-10}
+		  ],
+		  "nice_to_have_skills": [
+			{"name": "skill", "context": "exact text where this skill was mentioned or implied", "importance": 1-10}
+		  ],
+		  "company_info": {
+			"name": "company name",
+			"position": "job title",
+			"level": "seniority level"
+		  }
+		}` + relevantContent
 
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
@@ -164,7 +169,7 @@ func (l *LLM) ScoreResume(extractedSkills *types.ExtractedSkills, resumeText str
 	return &scoredResume, nil
 }
 
-func (l *LLM) TransformResumeBullets(extractedSkills *types.ExtractedSkills, items []types.TransformItem, emphasisLevel string) ([]types.TransformItem, error) {
+func (l *LLM) TransformResumeBullets(extractedSkills *types.ExtractedSkills, items []types.TransformItem) ([]types.TransformItem, error) {
 	for i := range items {
 		if items[i].ID == "" {
 			items[i].ID = fmt.Sprintf("%d", i+1)
@@ -181,36 +186,40 @@ func (l *LLM) TransformResumeBullets(extractedSkills *types.ExtractedSkills, ite
 		return nil, fmt.Errorf("failed to marshal items data: %w", err)
 	}
 
-	prompt := fmt.Sprintf(`Rewrite these resume bullet points to better match the job requirements.
-	For each bullet point:
-	1. Emphasize the skills/requirements from the job description that match
-	2. Every bullet must include a quantifiable metric or achievement
-	3. Front-load with technical achievements
-	4. Mirror the job's terminology exactly
-	5. Keep the same basic information but optimize it for this specific job
-	6. The emphasis level requested is: %s
-	
-	Job Requirements:
-	%s
-	
-	Bullet Points to Transform:
-	%s
-	
-	Return the result as a JSON array with the following structure for each item:
-	{
-		"id": "original id",
-		"original_text": "the original text",
-		"transformed_text": "the rewritten text",
-		"matching_skills": ["skill1", "skill2"],
-		"section": "original section",
-		"company": "original company if available",
-		"position": "original position if available",
-		"name": "original name if available"
-	}
-	
-	Don't abbreviate or use acronyms unless they appear in the original text or job description.
-	Focus on making each bullet sound natural while incorporating the required skills.`,
-		emphasisLevel, string(skillsJSON), string(itemsJSON))
+	prompt := fmt.Sprintf(`Transform these resume bullet points to better match the job requirements while sounding like a real human wrote them.
+		For each bullet point:
+		1. KEEP THE SAME CHARACTER COUNT (±10 percent) - this is critical
+		2. Preserve the original achievement metrics but make them relevant to the job
+		3. Use language that demonstrates competence in the SPECIFIC skills needed for this job
+		4. Sound like a professional in this field, not an HR robot
+		5. Maintain the original voice and style
+		6. Score how much better the new version matches the job (1-10)
+		Job Requirements:
+		%s
+
+		Bullet Points to Transform:
+		%s
+
+		Return as a JSON array with:
+		{
+			"id": "original id",
+			"original_text": "the original text",
+			"transformed_text": "the rewritten text", 
+			"char_count_original": 120,
+			"char_count_new": 115,
+			"original_skills": ["skills already in the bullet"],
+			"added_skills": ["new skills emphasized"],
+			"original_score": 5,
+			"new_score": 8,
+			"section": "original section",
+			"company": "original company",
+			"position": "original position",
+			"name": "original name if available"
+		}
+
+		CRUCIAL: The bullet must sound natural and authentic - avoid corporate speak, buzzword salad, or awkward keyword stuffing. It should read like it was written by an actual professional in this field, not an AI.`, string(skillsJSON), string(itemsJSON))
+
+	slog.Info("sending this prompt", "prompt",prompt)
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 
@@ -227,50 +236,4 @@ func (l *LLM) TransformResumeBullets(extractedSkills *types.ExtractedSkills, ite
 	}
 
 	return transformedItems, nil
-}
-
-func (l *LLM) GenerateAlternativeBullet(extractedSkills *types.ExtractedSkills, originalText string, matchingSkills []string, emphasisLevel string) (string, error) {
-	skillsJSON, err := json.Marshal(extractedSkills)
-	if err != nil {
-		return "", fmt.Errorf("failed to marshal skills data: %w", err)
-	}
-
-	matchingSkillsJSON, err := json.Marshal(matchingSkills)
-	if err != nil {
-		return "", fmt.Errorf("failed to marshal matching skills data: %w", err)
-	}
-
-	prompt := fmt.Sprintf(`Generate a different version of this resume bullet point that better matches the job requirements.
-	The new version should:
-	1. Emphasize the skills/requirements from the job description that match
-	2. Include a quantifiable metric or achievement
-	3. Front-load with technical achievements
-	4. Mirror the job's terminology exactly
-	5. Keep the same basic information but optimize it for this specific job
-	6. Be distinctly different from the original in structure and phrasing
-	7. The emphasis level requested is: %s
-	
-	Job Requirements:
-	%s
-	
-	Original Bullet Point:
-	%s
-	
-	Matching Skills to Emphasize:
-	%s
-	
-	Return ONLY the alternative bullet text with no additional commentary or explanation.
-	Don't abbreviate or use acronyms unless they appear in the original text or job description.
-	Focus on making the bullet sound natural while incorporating the required skills.`,
-		emphasisLevel, string(skillsJSON), originalText, string(matchingSkillsJSON))
-
-	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
-	defer cancel()
-
-	content, err := l.Generate(ctx, "You are a resume optimization expert who helps tailor resumes to specific job descriptions.", prompt)
-	if err != nil {
-		return "", fmt.Errorf("alternative generation failed: %w", err)
-	}
-
-	return clean.CleanLlmResponse(content), nil
 }

@@ -103,15 +103,19 @@ type TransformRequest struct {
 }
 
 type TransformItem struct {
-	ID              string   `json:"id"`
-	OriginalText    string   `json:"original_text"`
-	MatchingSkills  []string `json:"matching_skills"`
-	Section         string   `json:"section"`
-	Company         string   `json:"company,omitempty"`
-	Position        string   `json:"position,omitempty"`
-	Name            string   `json:"name,omitempty"`
-	TransformedText string   `json:"transformed_text,omitempty"`
-	AlternativeText string   `json:"alternative_text,omitempty"`
+	ID                string   `json:"id"`
+	OriginalText      string   `json:"original_text"`
+	TransformedText   string   `json:"transformed_text,omitempty"`
+	CharCountOriginal int      `json:"char_count_original"`
+	CharCountNew      int      `json:"char_count_new,omitempty"`
+	OriginalSkills    []string `json:"original_skills"`
+	AddedSkills       []string `json:"added_skills,omitempty"`
+	OriginalScore     float64  `json:"original_score"`
+	NewScore          float64  `json:"new_score,omitempty"`
+	Section           string   `json:"section"`
+	Company           string   `json:"company,omitempty"`
+	Position          string   `json:"position,omitempty"`
+	Name              string   `json:"name,omitempty"`
 }
 
 type TransformResponse struct {
@@ -127,4 +131,16 @@ type AlternativeRequest struct {
 
 type AlternativeResponse struct {
 	AlternativeText string `json:"alternative_text"`
+}
+
+// single EP types
+type OptimizeRequest struct {
+	JobDescText string `json:"jobDescText"`
+	Resume      string `json:"resume"`
+}
+
+type OptimizeResponse struct {
+	ExtractedSkills  ExtractedSkills `json:"extractedSkills"`
+	ScoredResume     ScoredResume    `json:"scoredResume"`
+	TransformedItems []TransformItem `json:"transformItems"`
 }
