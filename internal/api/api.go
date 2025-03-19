@@ -6,9 +6,7 @@ import (
 	"log/slog"
 	"net/http"
 
-	"github.com/p-shah256/tracker/internal/extraction"
-	"github.com/p-shah256/tracker/internal/matching"
-	"github.com/p-shah256/tracker/internal/transformation"
+	"github.com/p-shah256/tracker/internal/llm"
 	"github.com/p-shah256/tracker/pkg/types"
 )
 
@@ -62,7 +60,7 @@ func (s *Server) handleExtract(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	extractedSkills, err := extraction.ExtractSkills(jobDescContent)
+	extractedSkills, err := llm.ExtractSkills(jobDescContent)
 	if err != nil {
 		http.Error(w, fmt.Sprintf("Failed to extract skills: %v", err), http.StatusInternalServerError)
 		return
@@ -77,18 +75,12 @@ func (s *Server) handleMatch(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
 		return
 	}
-	err := r.ParseMultipartForm(10 << 20) // 10 MB max memory
-	if err != nil {
-		http.Error(w, "Failed to parse form", http.StatusBadRequest)
-		return
-	}
 
 	extractedSkillsJSON := r.FormValue("extractedSkills")
 	if extractedSkillsJSON == "" {
 		http.Error(w, "No extracted skills provided", http.StatusBadRequest)
 		return
 	}
-
 	var extractedSkills types.ExtractedSkills
 	if err := json.Unmarshal([]byte(extractedSkillsJSON), &extractedSkills); err != nil {
 		http.Error(w, "Invalid extracted skills format", http.StatusBadRequest)
@@ -101,7 +93,7 @@ func (s *Server) handleMatch(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	scoredResume, err := matching.ScoreResume(&extractedSkills, resumeText)
+	scoredResume, err := llm.ScoreResume(&extractedSkills, resumeText)
 	if err != nil {
 		http.Error(w, fmt.Sprintf("Failed to score resume: %v", err), http.StatusInternalServerError)
 		return
@@ -139,15 +131,15 @@ func (s *Server) handleTransform(w http.ResponseWriter, r *http.Request) {
 	if request.MinScore <= 0 {
 		request.MinScore = 7 // Default minimum score
 	}
-
-	transformedResume, err := transformation.TransformHighScoringEntries(request.ScoredResume, request.ExtractedSkills, request.MinScore)
-	if err != nil {
-		http.Error(w, fmt.Sprintf("Failed to transform resume: %v", err), http.StatusInternalServerError)
-		return
-	}
-
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(transformedResume)
+	//
+	// transformedResume, err := llm.TransformHighScoring(request.ScoredResume, request.ExtractedSkills, request.MinScore)
+	// if err != nil {
+	// 	http.Error(w, fmt.Sprintf("Failed to transform resume: %v", err), http.StatusInternalServerError)
+	// 	return
+	// }
+	//
+	// w.Header().Set("Content-Type", "application/json")
+	// json.NewEncoder(w).Encode(transformedResume)
 }
 
 func (s *Server) handleAlternative(w http.ResponseWriter, r *http.Request) {
@@ -160,12 +152,10 @@ func (s *Server) handleAlternative(w http.ResponseWriter, r *http.Request) {
 		BulletPoint    string   `json:"bullet_point"`
 		MatchingSkills []string `json:"matching_skills"`
 	}
-
 	if err := json.NewDecoder(r.Body).Decode(&request); err != nil {
 		http.Error(w, "Invalid request body", http.StatusBadRequest)
 		return
 	}
-
 	if request.BulletPoint == "" {
 		http.Error(w, "No bullet point provided", http.StatusBadRequest)
 		return
@@ -175,7 +165,7 @@ func (s *Server) handleAlternative(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	alternative, err := transformation.GenerateAlternative(request.BulletPoint, request.MatchingSkills)
+	alternative, err := llm.GenAlternative(request.BulletPoint, request.MatchingSkills)
 	if err != nil {
 		http.Error(w, fmt.Sprintf("Failed to generate alternative: %v", err), http.StatusInternalServerError)
 		return

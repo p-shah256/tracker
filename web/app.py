@@ -29,11 +29,11 @@ st.markdown(
         font-size: 0.8em;
     }
     .required {
-        background-color: #cfe2ff;
+        background-color: #91220a ;
         border: 1px solid #9ec5fe;
     }
     .nice-to-have {
-        background-color: #d1e7dd;
+        background-color: #005d10;
         border: 1px solid #a3cfbb;
     }
     .score-high {
@@ -72,7 +72,9 @@ if "transformed_resume" not in st.session_state:
 BACKEND_URL = "http://localhost:8080"
 
 
-def call_api(endpoint: str, data: Dict[str, Any], is_form: bool = False) -> Dict[str, Any]:
+def call_api(
+    endpoint: str, data: Dict[str, Any], is_form: bool = False
+) -> Dict[str, Any]:
     try:
         url = f"{BACKEND_URL}/api/{endpoint}"
         print(f"calling URL {url}")
@@ -130,7 +132,9 @@ with tab1:
         if not job_desc.strip():
             st.error("Please enter a job description")
         else:
-            extracted_data = call_api("extract", {"jobDescText": job_desc}, is_form=True)
+            extracted_data = call_api(
+                "extract", {"jobDescText": job_desc}, is_form=True
+            )
 
             if extracted_data:
                 st.session_state.extracted_skills = extracted_data
@@ -150,20 +154,146 @@ with tab1:
         with col3:
             st.info(f"**Level:** {company_info.get('level', 'N/A')}")
 
-        # Required skills
         st.markdown("### Required Skills")
         required_skills_html = ""
         for skill in skills.get("required_skills", []):
-            required_skills_html += (
-                f"<span class='skill-tag required'>{skill['name']}</span> "
-            )
+            required_skills_html += f"<span class='skill-tag required'>{skill['name']}: '{skill['context']}'</span> "
         st.markdown(required_skills_html, unsafe_allow_html=True)
 
-        # Nice-to-have skills
         st.markdown("### Nice-to-Have Skills")
         nice_skills_html = ""
         for skill in skills.get("nice_to_have_skills", []):
-            nice_skills_html += (
-                f"<span class='skill-tag nice-to-have'>{skill['name']}</span> "
-            )
+            nice_skills_html += f"<span class='skill-tag nice-to-have'>{skill['name']}: '{skill['context']}'</span> "
         st.markdown(nice_skills_html, unsafe_allow_html=True)
+
+
+# For tab2 - Resume Matching
+with tab2:
+    st.header("Step 2: Match Your Resume")
+
+    # Check if user has completed step 1
+    if not st.session_state.extracted_skills:
+        st.warning("Please complete Step 1 (Job Analysis) first")
+    else:
+        st.subheader("Enter Your Resume")
+
+        # Text area for resume input
+        resume_text = st.text_area(
+            "Paste your resume text here",
+            height=300,
+            placeholder="Copy and paste your full resume text...",
+            key="resume_text",
+        )
+
+        match_btn = st.button("Match Resume", type="primary")
+
+        if match_btn:
+            if not resume_text.strip():
+                st.error("Please enter your resume text")
+            else:
+                with st.spinner("Analyzing resume match..."):
+                    matched_data = call_api(
+                        "match",
+                        {
+                            "extractedSkills": json.dumps(
+                                st.session_state.extracted_skills
+                            ),
+                            "resumeText": resume_text,
+                        },
+                        is_form=True,
+                    )
+
+                    if matched_data:
+                        st.session_state.matched_resume = matched_data
+                        st.success("Resume matched successfully!")
+
+        if "matched_resume" in st.session_state and st.session_state.matched_resume:
+            st.subheader("Match Results")
+
+            if "overall_score" in st.session_state.matched_resume:
+                score = st.session_state.matched_resume["overall_score"]
+                st.markdown(f"### Overall Match Score: {score}/10")
+                if score >= 5:
+                    if st.button("Proceed to Resume Transformation", type="primary"):
+                        st.session_state.active_tab = 2  # Move to the third tab
+                else:
+                    st.warning(
+                        "Your resume has a low match score. Consider adding more relevant experience before proceeding."
+                    )
+            if "professional_experience" in st.session_state.matched_resume:
+                st.markdown("### Professional Experience")
+
+                for exp in st.session_state.matched_resume["professional_experience"]:
+                    with st.expander(
+                        f"{exp['company']} - {exp['position']} (Match Score: {exp['score']}/10)",
+                        expanded=True,
+                    ):
+                        st.markdown("**Matching Skills:**")
+                        skills_html = ""
+                        for skill in exp.get("matching_skills", []):
+                            skills_html += (
+                                f"<span class='skill-tag matched'>{skill}</span> "
+                            )
+                        st.markdown(skills_html, unsafe_allow_html=True)
+
+                        st.markdown("**Highlights:**")
+                        for highlight in exp.get("highlights", []):
+                            col1, col2 = st.columns([4, 1])
+                            with col1:
+                                st.markdown(highlight["text"])
+                            with col2:
+                                score_color = (
+                                    "green"
+                                    if highlight["score"] >= 7
+                                    else "orange" if highlight["score"] >= 5 else "red"
+                                )
+                                st.markdown(
+                                    f"<span style='color:{score_color};font-weight:bold;'>{highlight['score']}/10</span>",
+                                    unsafe_allow_html=True,
+                                )
+
+                            if highlight.get("matching_skills"):
+                                mini_skills_html = ""
+                                for skill in highlight.get("matching_skills", []):
+                                    mini_skills_html += f"<span class='skill-tag mini-matched'>{skill}</span> "
+                                st.markdown(mini_skills_html, unsafe_allow_html=True)
+                            st.divider()
+
+            if "projects" in st.session_state.matched_resume:
+                st.markdown("### Projects")
+
+                for project in st.session_state.matched_resume["projects"]:
+                    with st.expander(
+                        f"{project['name']} (Match Score: {project['score']}/10)",
+                        expanded=True,
+                    ):
+                        st.markdown("**Matching Skills:**")
+                        skills_html = ""
+                        for skill in project.get("matching_skills", []):
+                            skills_html += (
+                                f"<span class='skill-tag matched'>{skill}</span> "
+                            )
+                        st.markdown(skills_html, unsafe_allow_html=True)
+
+                        st.markdown("**Highlights:**")
+                        for highlight in project.get("highlights", []):
+                            col1, col2 = st.columns([4, 1])
+                            with col1:
+                                st.markdown(highlight["text"])
+                            with col2:
+                                score_color = (
+                                    "green"
+                                    if highlight["score"] >= 7
+                                    else "orange" if highlight["score"] >= 5 else "red"
+                                )
+                                st.markdown(
+                                    f"<span style='color:{score_color};font-weight:bold;'>{highlight['score']}/10</span>",
+                                    unsafe_allow_html=True,
+                                )
+
+                            if highlight.get("matching_skills"):
+                                mini_skills_html = ""
+                                for skill in highlight.get("matching_skills", []):
+                                    mini_skills_html += f"<span class='skill-tag mini-matched'>{skill}</span> "
+                                st.markdown(mini_skills_html, unsafe_allow_html=True)
+                            st.divider()
