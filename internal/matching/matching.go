@@ -8,22 +8,21 @@ import (
 	"time"
 
 	"github.com/google/generative-ai-go/genai"
-	"google.golang.org/api/option"
-
 	"github.com/p-shah256/tracker/internal/cleaner"
 	"github.com/p-shah256/tracker/pkg/types"
+	"google.golang.org/api/option"
 )
 
 var clean = cleaner.NewCleaner()
 
-func ScoreResumeEntries(extractedSkills *types.ExtractedSkills, resume *types.Resume) (*types.ScoredResume, error) {
+func ScoreResume(extractedSkills *types.ExtractedSkills, resumeText string) (*types.ScoredResume, error) {
 	resultCh := make(chan struct {
 		scoredResume *types.ScoredResume
 		err          error
 	})
 
 	go func() {
-		scoredResume, err := scoreResumeEntriesSync(extractedSkills, resume)
+		scoredResume, err := scoreResumeSync(extractedSkills, resumeText)
 		resultCh <- struct {
 			scoredResume *types.ScoredResume
 			err          error
@@ -34,15 +33,10 @@ func ScoreResumeEntries(extractedSkills *types.ExtractedSkills, resume *types.Re
 	return result.scoredResume, result.err
 }
 
-func scoreResumeEntriesSync(extractedSkills *types.ExtractedSkills, resume *types.Resume) (*types.ScoredResume, error) {
+func scoreResumeSync(extractedSkills *types.ExtractedSkills, resumeText string) (*types.ScoredResume, error) {
 	skillsJSON, err := json.Marshal(extractedSkills)
 	if err != nil {
 		return nil, fmt.Errorf("failed to marshal skills data: %w", err)
-	}
-
-	resumeJSON, err := json.Marshal(resume)
-	if err != nil {
-		return nil, fmt.Errorf("failed to marshal resume data: %w", err)
 	}
 
 	prompt := fmt.Sprintf(`For each experience entry in my resume, identify which skills/requirements from the job description it addresses. 
@@ -85,7 +79,7 @@ Return the result as a JSON object with the following structure:
       ]
     }
   ]
-}`, string(skillsJSON), string(resumeJSON))
+}`, string(skillsJSON), resumeText)
 
 	content, err := callGeminiAPI("You are a resume evaluation assistant. Score how well each resume entry matches the job requirements.", prompt)
 	if err != nil {
@@ -93,7 +87,7 @@ Return the result as a JSON object with the following structure:
 	}
 
 	cleanResponse := clean.CleanLlmResponse(content)
-	
+
 	var scoredResume types.ScoredResume
 	if err := json.Unmarshal([]byte(cleanResponse), &scoredResume); err != nil {
 		return nil, fmt.Errorf("failed to parse LLM response as JSON: %w", err)
@@ -104,8 +98,13 @@ Return the result as a JSON object with the following structure:
 
 func callGeminiAPI(systemPrompt, userPrompt string) (string, error) {
 	apiKey := os.Getenv("GEMINI_KEY")
+	if apiKey == "" {
+		return "", fmt.Errorf("GEMINI_KEY environment variable not set")
+	}
+
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
+
 	client, err := genai.NewClient(ctx, option.WithAPIKey(apiKey))
 	if err != nil {
 		return "", fmt.Errorf("failed to create Gemini client: %w", err)
@@ -118,6 +117,7 @@ func callGeminiAPI(systemPrompt, userPrompt string) (string, error) {
 			Parts: []genai.Part{genai.Text(systemPrompt)},
 		}
 	}
+
 	prompt := []genai.Part{genai.Text(userPrompt)}
 	resp, err := model.GenerateContent(ctx, prompt...)
 	if err != nil {
@@ -127,6 +127,7 @@ func callGeminiAPI(systemPrompt, userPrompt string) (string, error) {
 	if len(resp.Candidates) == 0 || len(resp.Candidates[0].Content.Parts) == 0 {
 		return "", fmt.Errorf("empty response from Gemini API")
 	}
+
 	response, ok := resp.Candidates[0].Content.Parts[0].(genai.Text)
 	if !ok {
 		return "", fmt.Errorf("unexpected response format from Gemini API")

@@ -22,13 +22,25 @@ func NewServer(port int) *Server {
 	}
 }
 
+func enableCORS(next http.HandlerFunc) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Access-Control-Allow-Origin", "*")
+		w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
+		w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization")
+		if r.Method == "OPTIONS" {
+			w.WriteHeader(http.StatusOK)
+			return
+		}
+		next(w, r)
+	}
+}
+
 func (s *Server) Start() error {
-	http.HandleFunc("/api/extract", s.handleExtract)
-	http.HandleFunc("/api/match", s.handleMatch)
-	http.HandleFunc("/api/transform", s.handleTransform)
-	http.HandleFunc("/api/alternative", s.handleAlternative)
-	fs := http.FileServer(http.Dir("./web/app"))
-	http.Handle("/", fs)
+	http.HandleFunc("/api/extract", enableCORS(s.handleExtract))
+	http.HandleFunc("/api/match", enableCORS(s.handleMatch))
+	http.HandleFunc("/api/transform", enableCORS(s.handleTransform))
+	http.HandleFunc("/api/alternative", enableCORS(s.handleAlternative))
+
 	addr := fmt.Sprintf(":%d", s.port)
 	slog.Info("Starting API server", "port", s.port)
 	return http.ListenAndServe(addr, nil)
@@ -39,14 +51,12 @@ func (s *Server) handleExtract(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
 		return
 	}
-	err := r.ParseMultipartForm(10 << 20)
+	err := r.ParseForm()
 	if err != nil {
 		http.Error(w, "Failed to parse form", http.StatusBadRequest)
 		return
 	}
-
-	var jobDescContent string
-	jobDescContent = r.FormValue("jobDescText")
+	jobDescContent := r.FormValue("jobDescText")
 	if jobDescContent == "" {
 		http.Error(w, "No job description provided", http.StatusBadRequest)
 		return
@@ -67,27 +77,31 @@ func (s *Server) handleMatch(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
 		return
 	}
-
-	var request struct {
-		ExtractedSkills *types.ExtractedSkills `json:"extracted_skills"`
-		Resume          *types.Resume          `json:"resume"`
-	}
-
-	if err := json.NewDecoder(r.Body).Decode(&request); err != nil {
-		http.Error(w, "Invalid request body", http.StatusBadRequest)
+	err := r.ParseMultipartForm(10 << 20) // 10 MB max memory
+	if err != nil {
+		http.Error(w, "Failed to parse form", http.StatusBadRequest)
 		return
 	}
 
-	if request.ExtractedSkills == nil {
+	extractedSkillsJSON := r.FormValue("extractedSkills")
+	if extractedSkillsJSON == "" {
 		http.Error(w, "No extracted skills provided", http.StatusBadRequest)
 		return
 	}
-	if request.Resume == nil {
-		http.Error(w, "No resume provided", http.StatusBadRequest)
+
+	var extractedSkills types.ExtractedSkills
+	if err := json.Unmarshal([]byte(extractedSkillsJSON), &extractedSkills); err != nil {
+		http.Error(w, "Invalid extracted skills format", http.StatusBadRequest)
 		return
 	}
 
-	scoredResume, err := matching.ScoreResumeEntries(request.ExtractedSkills, request.Resume)
+	resumeText := r.FormValue("resumeText")
+	if resumeText == "" {
+		http.Error(w, "No resume text provided", http.StatusBadRequest)
+		return
+	}
+
+	scoredResume, err := matching.ScoreResume(&extractedSkills, resumeText)
 	if err != nil {
 		http.Error(w, fmt.Sprintf("Failed to score resume: %v", err), http.StatusInternalServerError)
 		return
