@@ -17,12 +17,14 @@ func main() {
 	}
 	slog.Info("Starting Resume Tailor web application...")
 
+	// Check for Gemini API key
 	geminiKey := os.Getenv("GEMINI_KEY")
 	if geminiKey == "" {
 		slog.Error("Gemini API key not found in environment variables")
 		os.Exit(1)
 	}
 
+	// Create and start API server
 	server := api.NewServer(8080)
 	if err := server.Start(); err != nil {
 		slog.Error("Error starting API server", "error", err)

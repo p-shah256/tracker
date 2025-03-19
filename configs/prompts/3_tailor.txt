@@ -1,24 +1,24 @@
-I need an ATS-optimized resume tailored for this job. Response MUST be valid YAML using snake_case fields.
+I need you to weaponize my resume against this job description. Don't give me philosophy or explanations - just give me the 5 most lethal bullet points I can use.
 
-JOB DATA: %s
+JOB DESCRIPTION: %s
 
-RESUME SECTIONS: %s
+MY CURRENT RESUME BULLETS: %s
 
-OPTIMIZATION RULES:
-1. SURGICALLY insert JD keywords into EXISTING technical achievements - don't add fluff
-2. Every bullet MUST contain quantifiable metrics (maintain the original numbers)
-3. Keep each bullet CONCISE and FOCUSED - no tacking on generic skill statements
-4. DO NOT mention soft skills like "quick learner" or "interpersonal" directly - show them through achievements
-5. Keywords should appear natural in context, NOT forced or stuffed
+INSTRUCTIONS:
+1. Pick the 5 most relevant bullet points from my resume
+2. Rewrite each to mirror the exact terminology and tech stack from the JD
+3. Front-load with technical achievements and metrics (numbers, percentages, scale)
+4. Make each bullet sound impressive as fuck but still credible
+5. Format your response EXACTLY like this:
 
-FORMAT REQUIREMENTS:
-- ALL strings with special chars (like **) MUST use double quotes
-- Example: technical_skills: ["**Languages:** Python, C++"]
+ORIGINAL:
+- Original bullet 1
+- Original bullet 2
+- etc.
 
-BAD EXAMPLE:
-Original: "Engineered image processing pipeline using Docker reducing time by 73%"
-Bad: "Engineered image processing pipeline using Docker reducing time by 73%, showcasing computer science and networking skills and demonstrating quick learner capabilities"
+WEAPONIZED:
+- New bullet 1
+- New bullet 2
+- etc.
 
-GOOD EXAMPLE: 
-Original: "Engineered image processing pipeline using Docker reducing time by 73%"
-Good: "Engineered TCP/IP-optimized image processing pipeline using Docker and Linux microservices reducing processing time by 73% across distributed networks"
+Don't explain your choices. Just give me the goods.

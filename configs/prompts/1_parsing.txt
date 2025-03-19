@@ -21,6 +21,7 @@ Parse this HTML into structured JSON:
 }
 
 Key Rules:
+0. sort skills based on priority
 1. Level calculation: explicit years > highest skill requirement > implied (senior=8+, mid=4-7, junior=0-3)
 2. Split compound skills into separate entries
 3. Priority based on position, emphasis, language strength

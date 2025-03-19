@@ -11,7 +11,6 @@ import (
 
 	"github.com/google/generative-ai-go/genai"
 	"google.golang.org/api/option"
-	"gopkg.in/yaml.v3"
 
 	"github.com/p-shah256/tracker/internal/cleaner"
 	"github.com/p-shah256/tracker/pkg/types"
@@ -63,19 +62,19 @@ func ParseJD(htmlFilePath string) (*types.JdJson, error) {
 	return &response.DBFriendly, nil
 }
 
-func GetTailored(dbFriendly *types.JdJson, resume types.Resume) (*types.Resume, error) {
+func GetTailored(dbFriendly *types.JdJson, resume types.Resume) (string, error) {
 	tailorPath := filepath.Join(".", "configs", "prompts", "3_tailor.txt")
 	tailorPrompt, err := os.ReadFile(tailorPath)
 	if err != nil {
-		return nil, fmt.Errorf("failed to read tailor prompt: %w", err)
+		return "", fmt.Errorf("failed to read tailor prompt: %w", err)
 	}
 	dbFriendlyJSON, err := json.Marshal(dbFriendly)
 	if err != nil {
-		return nil, fmt.Errorf("failed to marshal job data: %w", err)
+		return "", fmt.Errorf("failed to marshal job data: %w", err)
 	}
 	resumeJSON, err := json.Marshal(resume)
 	if err != nil {
-		return nil, fmt.Errorf("failed to marshal resume data: %w", err)
+		return "", fmt.Errorf("failed to marshal resume data: %w", err)
 	}
 
 	userMessage := fmt.Sprintf(string(tailorPrompt), string(dbFriendlyJSON), string(resumeJSON))
@@ -83,23 +82,12 @@ func GetTailored(dbFriendly *types.JdJson, resume types.Resume) (*types.Resume, 
 
 	content, err := callGeminiAPI(string(tailorPrompt), userMessage)
 	if err != nil {
-		return nil, fmt.Errorf("resume tailoring failed: %w", err)
+		return "", fmt.Errorf("resume tailoring failed: %w", err)
 	}
 
 	cleanResponse := clean.CleanLlmResponse(content)
 
-	var tailoredResume types.Resume
-	err = yaml.Unmarshal([]byte(cleanResponse), &tailoredResume)
-	if err != nil {
-		slog.Error("Failed to parse LLM response as YAML, using fallback parsing",
-			"error", err,
-			"invalidYAML", cleanResponse[:min(500, len(cleanResponse))])
-
-		tailoredResume = resume
-	}
-
-	slog.Debug("Tailored resume generated", "tailoredResume", tailoredResume)
-	return &tailoredResume, nil
+	return cleanResponse, nil
 }
 
 func callGeminiAPI(systemPrompt, userPrompt string) (string, error) {
