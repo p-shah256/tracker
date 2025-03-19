@@ -49,6 +49,42 @@ func callGeminiAPI(systemPrompt, userPrompt string) (string, error) {
 	return string(response), nil
 }
 
+func ExtractSkills(jobDescContent string) (*types.ExtractedSkills, error) {
+	relevantContent := clean.CleanHTML(jobDescContent)
+
+	prompt := `Extract every technical skill, tool, platform, methodology, and metric mentioned in this job description. 
+	Format as a prioritized list with required skills first, nice-to-have second.
+	Return the result as a JSON object with the following structure:
+	{
+	  "required_skills": [
+		{"name": "skill name", "context": "original text from job description"}
+	  ],
+	  "nice_to_have_skills": [
+		{"name": "skill name", "context": "original text from job description"}
+	  ],
+	  "company_info": {
+		"name": "company name if mentioned",
+		"position": "job title",
+		"level": "seniority level if mentioned"
+	  }
+	}
+	Job Description:
+	` + relevantContent
+
+	content, err := callGeminiAPI("You are a precise skill extraction assistant. Extract only skills explicitly mentioned in the job description.", prompt)
+	if err != nil {
+		return nil, fmt.Errorf("skill extraction failed: %w", err)
+	}
+	cleanResponse := clean.CleanLlmResponse(content)
+
+	var extractedSkills types.ExtractedSkills
+	if err := json.Unmarshal([]byte(cleanResponse), &extractedSkills); err != nil {
+		return nil, fmt.Errorf("failed to parse LLM response as JSON: %w", err)
+	}
+
+	return &extractedSkills, nil
+}
+
 func ScoreResume(extractedSkills *types.ExtractedSkills, resumeText string) (*types.ScoredResume, error) {
 	skillsJSON, err := json.Marshal(extractedSkills)
 	if err != nil {
@@ -109,158 +145,111 @@ func ScoreResume(extractedSkills *types.ExtractedSkills, resumeText string) (*ty
 	return &scoredResume, nil
 }
 
-func ExtractSkills(jobDescContent string) (*types.ExtractedSkills, error) {
-	relevantContent := clean.CleanHTML(jobDescContent)
-
-	prompt := `Extract every technical skill, tool, platform, methodology, and metric mentioned in this job description. 
-	Format as a prioritized list with required skills first, nice-to-have second.
-	Return the result as a JSON object with the following structure:
-	{
-	  "required_skills": [
-		{"name": "skill name", "context": "original text from job description"}
-	  ],
-	  "nice_to_have_skills": [
-		{"name": "skill name", "context": "original text from job description"}
-	  ],
-	  "company_info": {
-		"name": "company name if mentioned",
-		"position": "job title",
-		"level": "seniority level if mentioned"
-	  }
+// LLM function to transform resume bullets
+func TransformResumeBullets(extractedSkills *types.ExtractedSkills, items []types.TransformItem, emphasisLevel string) ([]types.TransformItem, error) {
+	// Add unique IDs to items if they don't have them
+	for i := range items {
+		if items[i].ID == "" {
+			items[i].ID = fmt.Sprintf("%d", i+1)
+		}
 	}
-	Job Description:
-	` + relevantContent
 
-	content, err := callGeminiAPI("You are a precise skill extraction assistant. Extract only skills explicitly mentioned in the job description.", prompt)
+	skillsJSON, err := json.Marshal(extractedSkills)
 	if err != nil {
-		return nil, fmt.Errorf("skill extraction failed: %w", err)
+		return nil, fmt.Errorf("failed to marshal skills data: %w", err)
 	}
+
+	itemsJSON, err := json.Marshal(items)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal items data: %w", err)
+	}
+
+	prompt := fmt.Sprintf(`Rewrite these resume bullet points to better match the job requirements.
+	For each bullet point:
+	1. Emphasize the skills/requirements from the job description that match
+	2. Every bullet must include a quantifiable metric or achievement
+	3. Front-load with technical achievements
+	4. Mirror the job's terminology exactly
+	5. Keep the same basic information but optimize it for this specific job
+	6. The emphasis level requested is: %s
+	
+	Job Requirements:
+	%s
+	
+	Bullet Points to Transform:
+	%s
+	
+	Return the result as a JSON array with the following structure for each item:
+	{
+		"id": "original id",
+		"original_text": "the original text",
+		"transformed_text": "the rewritten text",
+		"matching_skills": ["skill1", "skill2"],
+		"section": "original section",
+		"company": "original company if available",
+		"position": "original position if available",
+		"name": "original name if available"
+	}
+	
+	Don't abbreviate or use acronyms unless they appear in the original text or job description.
+	Focus on making each bullet sound natural while incorporating the required skills.`,
+		emphasisLevel, string(skillsJSON), string(itemsJSON))
+
+	content, err := callGeminiAPI("You are a resume optimization expert who helps tailor resumes to specific job descriptions.", prompt)
+	if err != nil {
+		return nil, fmt.Errorf("resume transformation failed: %w", err)
+	}
+
 	cleanResponse := clean.CleanLlmResponse(content)
 
-	var extractedSkills types.ExtractedSkills
-	if err := json.Unmarshal([]byte(cleanResponse), &extractedSkills); err != nil {
+	var transformedItems []types.TransformItem
+	if err := json.Unmarshal([]byte(cleanResponse), &transformedItems); err != nil {
 		return nil, fmt.Errorf("failed to parse LLM response as JSON: %w", err)
 	}
 
-	return &extractedSkills, nil
+	return transformedItems, nil
 }
 
-func GenAlternative(bulletPoint string, matchingSkills []string) (string, error) {
-	skillsJSON, err := json.Marshal(matchingSkills)
+// LLM function to generate alternative bullet
+func GenerateAlternativeBullet(extractedSkills *types.ExtractedSkills, originalText string, matchingSkills []string, emphasisLevel string) (string, error) {
+	skillsJSON, err := json.Marshal(extractedSkills)
 	if err != nil {
 		return "", fmt.Errorf("failed to marshal skills data: %w", err)
 	}
 
-	prompt := fmt.Sprintf(`Generate an alternative version of this resume bullet point that emphasizes these skills: %s
-		Original bullet point:
-		%s
+	matchingSkillsJSON, err := json.Marshal(matchingSkills)
+	if err != nil {
+		return "", fmt.Errorf("failed to marshal matching skills data: %w", err)
+	}
 
-		The alternative version must:
-		1. Include a specific metric or quantifiable achievement
-		2. Front-load with technical achievement
-		3. Use the exact terminology from the skills list
-		4. Be concise and impactful
-		5. Demonstrate the same experience but with different wording
+	prompt := fmt.Sprintf(`Generate a different version of this resume bullet point that better matches the job requirements.
+	The new version should:
+	1. Emphasize the skills/requirements from the job description that match
+	2. Include a quantifiable metric or achievement
+	3. Front-load with technical achievements
+	4. Mirror the job's terminology exactly
+	5. Keep the same basic information but optimize it for this specific job
+	6. Be distinctly different from the original in structure and phrasing
+	7. The emphasis level requested is: %s
+	
+	Job Requirements:
+	%s
+	
+	Original Bullet Point:
+	%s
+	
+	Matching Skills to Emphasize:
+	%s
+	
+	Return ONLY the alternative bullet text with no additional commentary or explanation.
+	Don't abbreviate or use acronyms unless they appear in the original text or job description.
+	Focus on making the bullet sound natural while incorporating the required skills.`,
+		emphasisLevel, string(skillsJSON), originalText, string(matchingSkillsJSON))
 
-		Return only the rewritten bullet point with no additional text.`, string(skillsJSON), bulletPoint)
-
-	content, err := callGeminiAPI("You are a resume optimization assistant. Generate alternative bullet points that emphasize specific skills.", prompt)
+	content, err := callGeminiAPI("You are a resume optimization expert who helps tailor resumes to specific job descriptions.", prompt)
 	if err != nil {
 		return "", fmt.Errorf("alternative generation failed: %w", err)
 	}
-	cleanResponse := clean.CleanLlmResponse(content)
-	return cleanResponse, nil
-}
 
-// func TransformHighScoring(scoredResume *types.ScoredResume, extractedSkills *types.ExtractedSkills, minScore int) (*types.TransformedResume, error) {
-// 	var highScoringExperiences []types.ScoredExperienceItem
-// 	for _, exp := range scoredResume.ProfessionalExperience {
-// 		if exp.Score >= minScore {
-// 			highScoringExperiences = append(highScoringExperiences, exp)
-// 		}
-// 	}
-//
-// 	var highScoringProjects []types.ScoredProjectItem
-// 	for _, proj := range scoredResume.Projects {
-// 		if proj.Score >= minScore {
-// 			highScoringProjects = append(highScoringProjects, proj)
-// 		}
-// 	}
-//
-// 	if len(highScoringExperiences) == 0 && len(highScoringProjects) == 0 {
-// 		return nil, fmt.Errorf("no high-scoring entries found with score >= %d", minScore)
-// 	}
-//
-// 	filteredResumeData := struct {
-// 		ProfessionalExperience []types.ScoredExperienceItem `json:"professional_experience"`
-// 		Projects               []types.ScoredProjectItem    `json:"projects"`
-// 	}{
-// 		ProfessionalExperience: highScoringExperiences,
-// 		Projects:               highScoringProjects,
-// 	}
-//
-// 	filteredResumeJSON, err := json.Marshal(filteredResumeData)
-// 	if err != nil {
-// 		return nil, fmt.Errorf("failed to marshal filtered resume data: %w", err)
-// 	}
-//
-// 	skillsJSON, err := json.Marshal(extractedSkills)
-// 	if err != nil {
-// 		return nil, fmt.Errorf("failed to marshal skills data: %w", err)
-// 	}
-//
-// 	prompt := fmt.Sprintf(`Rewrite these high-scoring resume bullet points to emphasize these exact keywords from the job description.
-// 	Every bullet must:
-// 	1. Include a metric or quantifiable achievement
-// 	2. Front-load with technical achievement
-// 	3. Mirror the job's exact terminology
-// 	4. Make it clear the candidate has done exactly what the employer wants
-// 	5. Be concise and impactful
-//
-// 	Job Requirements:
-// 	%s
-//
-// 	High-Scoring Resume Entries:
-// 	%s
-//
-// 	Return the result as a JSON object with the following structure:
-// 	{
-// 	  "professional_experience": [
-// 		{
-// 		  "company": "company name",
-// 		  "position": "position title",
-// 		  "highlights": [
-// 			{
-// 			  "original": "original bullet point",
-// 			  "transformed": "rewritten bullet point",
-// 			  "emphasized_skills": ["skill1", "skill2"]
-// 			}
-// 		  ]
-// 		}
-// 	  ],
-// 	  "projects": [
-// 		{
-// 		  "name": "project name",
-// 		  "highlights": [
-// 			{
-// 			  "original": "original bullet point",
-// 			  "transformed": "rewritten bullet point",
-// 			  "emphasized_skills": ["skill1", "skill3"]
-// 			}
-// 		  ]
-// 		}
-// 	  ]
-// 	}`, string(skillsJSON), string(filteredResumeJSON))
-//
-// 	content, err := callGeminiAPI("You are a resume optimization assistant. Rewrite resume bullet points to emphasize job-specific skills and include metrics.", prompt)
-// 	if err != nil {
-// 		return nil, fmt.Errorf("resume transformation failed: %w", err)
-// 	}
-// 	cleanResponse := clean.CleanLlmResponse(content)
-// 	var transformedResume types.TransformedResume
-// 	if err := json.Unmarshal([]byte(cleanResponse), &transformedResume); err != nil {
-// 		return nil, fmt.Errorf("failed to parse LLM response as JSON: %w", err)
-// 	}
-//
-// 	return &transformedResume, nil
-// }
+	return clean.CleanLlmResponse(content), nil
+}

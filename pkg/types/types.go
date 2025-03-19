@@ -97,3 +97,36 @@ type TransformedResume struct {
 	ProfessionalExperience []TransformedExperienceItem `json:"professional_experience"`
 	Projects               []TransformedProjectItem    `json:"projects"`
 }
+
+type TransformRequest struct {
+	ExtractedSkills string `json:"extractedSkills"`
+	Items           string `json:"items"`
+	EmphasisLevel   string `json:"emphasisLevel"`
+}
+
+type TransformItem struct {
+	ID              string   `json:"id"`
+	OriginalText    string   `json:"original_text"`
+	MatchingSkills  []string `json:"matching_skills"`
+	Section         string   `json:"section"`
+	Company         string   `json:"company,omitempty"`
+	Position        string   `json:"position,omitempty"`
+	Name            string   `json:"name,omitempty"`
+	TransformedText string   `json:"transformed_text,omitempty"`
+	AlternativeText string   `json:"alternative_text,omitempty"`
+}
+
+type TransformResponse struct {
+	Items []TransformItem `json:"items"`
+}
+
+type AlternativeRequest struct {
+	ExtractedSkills string `json:"extractedSkills"`
+	OriginalText    string `json:"originalText"`
+	MatchingSkills  string `json:"matchingSkills"`
+	EmphasisLevel   string `json:"emphasisLevel"`
+}
+
+type AlternativeResponse struct {
+	AlternativeText string `json:"alternative_text"`
+}

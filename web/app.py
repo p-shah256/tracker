@@ -72,22 +72,33 @@ if "transformed_resume" not in st.session_state:
 BACKEND_URL = "http://localhost:8080"
 
 
-def call_api(
-    endpoint: str, data: Dict[str, Any], is_form: bool = False
-) -> Dict[str, Any]:
-    try:
-        url = f"{BACKEND_URL}/api/{endpoint}"
-        print(f"calling URL {url}")
-        with st.spinner(f"Processing... This might take a few seconds"):
-            if is_form:
-                response = requests.post(url, data=data)
-            else:
-                response = requests.post(url, json=data)
-            if response.status_code != 200:
-                st.error(f"API Error: {response.status_code} - {response.text}")
-                return None
+def call_api(endpoint, data, is_form=False):
+    """
+    Call the API with the given endpoint and data.
 
-            return response.json()
+    Args:
+        endpoint (str): The API endpoint to call.
+        data (dict): The data to send to the API.
+        is_form (bool, optional): Whether to send as form data. Defaults to False.
+
+    Returns:
+        The parsed JSON response or None if there was an error.
+    """
+    api_url = f"{BACKEND_URL}/api/{endpoint}"
+
+    try:
+        if is_form:
+            response = requests.post(api_url, data=data)
+        else:
+            headers = {"Content-Type": "application/json"}
+            response = requests.post(api_url, json=data, headers=headers)
+
+        if response.status_code != 200:
+            st.error(f"API Error: {response.status_code} - {response.text}")
+            return None
+
+        return response.json()
+
     except Exception as e:
         st.error(f"Error calling API: {str(e)}")
         return None
@@ -297,3 +308,432 @@ with tab2:
                                     mini_skills_html += f"<span class='skill-tag mini-matched'>{skill}</span> "
                                 st.markdown(mini_skills_html, unsafe_allow_html=True)
                             st.divider()
+
+
+with tab3:
+    st.header("Step 3: Transform Your Resume")
+
+    if not st.session_state.get("extracted_skills"):
+        st.warning("Please complete Step 1 (Job Analysis) first")
+    elif not st.session_state.get("matched_resume"):
+        st.warning("Please complete Step 2 (Resume Matching) first")
+    else:
+        st.subheader("Optimize Your Resume")
+
+        st.markdown(
+            """
+        This step will transform your top-scoring resume bullets to better match the job requirements.
+        We'll focus on bullets with scores of 7 or higher, as these are your strongest matches.
+        """
+        )
+
+        st.markdown("### Transformation Settings")
+        col1, col2 = st.columns(2)
+        with col1:
+            min_score = st.slider("Minimum score to transform", 1, 10, 7)
+        with col2:
+            emphasis_level = st.select_slider(
+                "Keyword emphasis level",
+                options=["Subtle", "Moderate", "Strong"],
+                value="Moderate",
+            )
+
+        transform_btn = st.button("Transform Resume", type="primary")
+
+        if transform_btn:
+            with st.spinner("Optimizing your resume..."):
+                high_scoring_items = []
+
+                for exp in st.session_state.matched_resume.get(
+                    "professional_experience", []
+                ):
+                    exp_items = []
+                    for highlight in exp.get("highlights", []):
+                        if highlight.get("score", 0) >= min_score:
+                            exp_items.append(
+                                {
+                                    "original_text": highlight["text"],
+                                    "matching_skills": highlight.get(
+                                        "matching_skills", []
+                                    ),
+                                    "section": "experience",
+                                    "company": exp.get("company", ""),
+                                    "position": exp.get("position", ""),
+                                }
+                            )
+                    high_scoring_items.extend(exp_items)
+
+                for project in st.session_state.matched_resume.get("projects", []):
+                    project_items = []
+                    for highlight in project.get("highlights", []):
+                        if highlight.get("score", 0) >= min_score:
+                            project_items.append(
+                                {
+                                    "original_text": highlight["text"],
+                                    "matching_skills": highlight.get(
+                                        "matching_skills", []
+                                    ),
+                                    "section": "project",
+                                    "name": project.get("name", ""),
+                                }
+                            )
+                    high_scoring_items.extend(project_items)
+
+                if not high_scoring_items:
+                    st.warning(
+                        f"No bullet points with score {min_score} or higher found. Try lowering the minimum score."
+                    )
+                else:
+                    # Call the transform API
+                    transformed_data = call_api(
+                        "transform",
+                        {
+                            "extractedSkills": json.dumps(
+                                st.session_state.extracted_skills
+                            ),
+                            "items": json.dumps(high_scoring_items),
+                            "emphasisLevel": emphasis_level,
+                        },
+                    )
+
+                    if transformed_data:
+                        st.session_state.transformed_resume = transformed_data
+                        st.success(
+                            f"Successfully transformed {len(transformed_data.get('items', []))} bullet points!"
+                        )
+
+        if (
+            "transformed_resume" in st.session_state
+            and st.session_state.transformed_resume
+        ):
+            st.subheader("Transformed Resume")
+
+            transformed_items = st.session_state.transformed_resume.get("items", [])
+
+            experience_items = {}
+            project_items = {}
+
+            for item in transformed_items:
+                if item.get("section") == "experience":
+                    company_key = f"{item.get('company')} - {item.get('position')}"
+                    if company_key not in experience_items:
+                        experience_items[company_key] = []
+                    experience_items[company_key].append(item)
+                elif item.get("section") == "project":
+                    project_name = item.get("name", "")
+                    if project_name not in project_items:
+                        project_items[project_name] = []
+                    project_items[project_name].append(item)
+
+            if experience_items:
+                st.markdown("### Professional Experience")
+
+                for company, items in experience_items.items():
+                    with st.expander(company, expanded=True):
+                        for item in items:
+                            col1, col2 = st.columns(2)
+
+                            with col1:
+                                st.markdown("**Original:**")
+                                st.markdown(item.get("original_text", ""))
+
+                            with col2:
+                                st.markdown("**Optimized:**")
+                                optimized_text = item.get("transformed_text", "")
+                                # Highlight keywords
+                                for skill in item.get("matching_skills", []):
+                                    # Case-insensitive replace with bold
+                                    pattern = re.compile(
+                                        re.escape(skill), re.IGNORECASE
+                                    )
+                                    optimized_text = pattern.sub(
+                                        f"**{skill}**", optimized_text
+                                    )
+                                st.markdown(optimized_text)
+
+                            # Actions for this bullet
+                            col1, col2, col3 = st.columns([1, 1, 2])
+                            with col1:
+                                if st.button(
+                                    f"Keep Original #{item.get('id', '')}",
+                                    key=f"keep_orig_{item.get('id', '')}",
+                                ):
+                                    # Logic to keep original
+                                    st.session_state.final_choices = (
+                                        st.session_state.get("final_choices", {})
+                                    )
+                                    st.session_state.final_choices[
+                                        item.get("id", "")
+                                    ] = {
+                                        "text": item.get("original_text", ""),
+                                        "is_original": True,
+                                    }
+                                    st.success("Original version selected!")
+
+                            with col2:
+                                if st.button(
+                                    f"Keep Optimized #{item.get('id', '')}",
+                                    key=f"keep_opt_{item.get('id', '')}",
+                                ):
+                                    # Logic to keep optimized
+                                    st.session_state.final_choices = (
+                                        st.session_state.get("final_choices", {})
+                                    )
+                                    st.session_state.final_choices[
+                                        item.get("id", "")
+                                    ] = {
+                                        "text": item.get("transformed_text", ""),
+                                        "is_original": False,
+                                    }
+                                    st.success("Optimized version selected!")
+
+                            with col3:
+                                if st.button(
+                                    f"Generate Alternative #{item.get('id', '')}",
+                                    key=f"alt_{item.get('id', '')}",
+                                ):
+                                    # Call API to generate alternative
+                                    alternative_data = call_api(
+                                        "alternative",
+                                        {
+                                            "extractedSkills": json.dumps(
+                                                st.session_state.extracted_skills
+                                            ),
+                                            "originalText": item.get(
+                                                "original_text", ""
+                                            ),
+                                            "matchingSkills": json.dumps(
+                                                item.get("matching_skills", [])
+                                            ),
+                                            "emphasisLevel": emphasis_level,
+                                        },
+                                    )
+
+                                    if (
+                                        alternative_data
+                                        and "alternative_text" in alternative_data
+                                    ):
+                                        # Update the item with the alternative
+                                        for i, t_item in enumerate(transformed_items):
+                                            if t_item.get("id") == item.get("id"):
+                                                transformed_items[i][
+                                                    "alternative_text"
+                                                ] = alternative_data["alternative_text"]
+                                                break
+                                        st.session_state.transformed_resume["items"] = (
+                                            transformed_items
+                                        )
+                                        st.success("Alternative generated!")
+                                        st.experimental_rerun()
+
+                            if "alternative_text" in item:
+                                st.markdown("**Alternative:**")
+                                alt_text = item.get("alternative_text", "")
+                                # Highlight keywords
+                                for skill in item.get("matching_skills", []):
+                                    pattern = re.compile(
+                                        re.escape(skill), re.IGNORECASE
+                                    )
+                                    alt_text = pattern.sub(f"**{skill}**", alt_text)
+                                st.markdown(alt_text)
+
+                                if st.button(
+                                    f"Keep Alternative #{item.get('id', '')}",
+                                    key=f"keep_alt_{item.get('id', '')}",
+                                ):
+                                    # Logic to keep alternative
+                                    st.session_state.final_choices = (
+                                        st.session_state.get("final_choices", {})
+                                    )
+                                    st.session_state.final_choices[
+                                        item.get("id", "")
+                                    ] = {
+                                        "text": item.get("alternative_text", ""),
+                                        "is_original": False,
+                                    }
+                                    st.success("Alternative version selected!")
+
+                            st.divider()
+
+            if project_items:
+                st.markdown("### Projects")
+
+                for project_name, items in project_items.items():
+                    with st.expander(project_name, expanded=True):
+                        for item in items:
+                            col1, col2 = st.columns(2)
+
+                            with col1:
+                                st.markdown("**Original:**")
+                                st.markdown(item.get("original_text", ""))
+
+                            with col2:
+                                st.markdown("**Optimized:**")
+                                optimized_text = item.get("transformed_text", "")
+                                # Highlight keywords
+                                for skill in item.get("matching_skills", []):
+                                    pattern = re.compile(
+                                        re.escape(skill), re.IGNORECASE
+                                    )
+                                    optimized_text = pattern.sub(
+                                        f"**{skill}**", optimized_text
+                                    )
+                                st.markdown(optimized_text)
+
+                            col1, col2, col3 = st.columns([1, 1, 2])
+                            with col1:
+                                if st.button(
+                                    f"Keep Original #{item.get('id', '')}",
+                                    key=f"p_keep_orig_{item.get('id', '')}",
+                                ):
+                                    # Logic to keep original
+                                    st.session_state.final_choices = (
+                                        st.session_state.get("final_choices", {})
+                                    )
+                                    st.session_state.final_choices[
+                                        item.get("id", "")
+                                    ] = {
+                                        "text": item.get("original_text", ""),
+                                        "is_original": True,
+                                    }
+                                    st.success("Original version selected!")
+
+                            with col2:
+                                if st.button(
+                                    f"Keep Optimized #{item.get('id', '')}",
+                                    key=f"p_keep_opt_{item.get('id', '')}",
+                                ):
+                                    # Logic to keep optimized
+                                    st.session_state.final_choices = (
+                                        st.session_state.get("final_choices", {})
+                                    )
+                                    st.session_state.final_choices[
+                                        item.get("id", "")
+                                    ] = {
+                                        "text": item.get("transformed_text", ""),
+                                        "is_original": False,
+                                    }
+                                    st.success("Optimized version selected!")
+
+                            with col3:
+                                if st.button(
+                                    f"Generate Alternative #{item.get('id', '')}",
+                                    key=f"p_alt_{item.get('id', '')}",
+                                ):
+                                    # Call API to generate alternative
+                                    alternative_data = call_api(
+                                        "alternative",
+                                        {
+                                            "extractedSkills": json.dumps(
+                                                st.session_state.extracted_skills
+                                            ),
+                                            "originalText": item.get(
+                                                "original_text", ""
+                                            ),
+                                            "matchingSkills": json.dumps(
+                                                item.get("matching_skills", [])
+                                            ),
+                                            "emphasisLevel": emphasis_level,
+                                        },
+                                    )
+
+                                    if (
+                                        alternative_data
+                                        and "alternative_text" in alternative_data
+                                    ):
+                                        # Update the item with the alternative
+                                        for i, t_item in enumerate(transformed_items):
+                                            if t_item.get("id") == item.get("id"):
+                                                transformed_items[i][
+                                                    "alternative_text"
+                                                ] = alternative_data["alternative_text"]
+                                                break
+                                        st.session_state.transformed_resume["items"] = (
+                                            transformed_items
+                                        )
+                                        st.success("Alternative generated!")
+                                        st.experimental_rerun()
+
+                            # Show alternative if available
+                            if "alternative_text" in item:
+                                st.markdown("**Alternative:**")
+                                alt_text = item.get("alternative_text", "")
+                                # Highlight keywords
+                                for skill in item.get("matching_skills", []):
+                                    pattern = re.compile(
+                                        re.escape(skill), re.IGNORECASE
+                                    )
+                                    alt_text = pattern.sub(f"**{skill}**", alt_text)
+                                st.markdown(alt_text)
+
+                                if st.button(
+                                    f"Keep Alternative #{item.get('id', '')}",
+                                    key=f"p_keep_alt_{item.get('id', '')}",
+                                ):
+                                    # Logic to keep alternative
+                                    st.session_state.final_choices = (
+                                        st.session_state.get("final_choices", {})
+                                    )
+                                    st.session_state.final_choices[
+                                        item.get("id", "")
+                                    ] = {
+                                        "text": item.get("alternative_text", ""),
+                                        "is_original": False,
+                                    }
+                                    st.success("Alternative version selected!")
+
+                            st.divider()
+
+            # Export button and final resume view
+            if st.session_state.get("final_choices"):
+                st.subheader("Your Optimized Resume")
+
+                # Count selections
+                original_count = sum(
+                    1
+                    for item in st.session_state.final_choices.values()
+                    if item.get("is_original", False)
+                )
+                optimized_count = len(st.session_state.final_choices) - original_count
+
+                st.info(
+                    f"You've selected {len(st.session_state.final_choices)} bullet points: {original_count} original and {optimized_count} optimized."
+                )
+
+                # Show the selected bullets
+                selected_bullets = ""
+                for item_id, choice in st.session_state.final_choices.items():
+                    selected_bullets += f"• {choice['text']}\n\n"
+
+                st.text_area(
+                    "Your Selected Bullet Points", selected_bullets, height=300
+                )
+
+                # Export options
+                export_col1, export_col2 = st.columns(2)
+                with export_col1:
+                    if st.button("Copy to Clipboard", type="primary"):
+                        # Use JavaScript to copy to clipboard
+                        st.write(
+                            """
+                        <script>
+                        navigator.clipboard.writeText(`%s`).then(function() {
+                            alert('Copied to clipboard!');
+                        }, function() {
+                            alert('Failed to copy!');
+                        });
+                        </script>
+                        """
+                            % selected_bullets,
+                            unsafe_allow_html=True,
+                        )
+                        st.success("Copied to clipboard!")
+
+                with export_col2:
+                    if st.download_button(
+                        label="Download as Text",
+                        data=selected_bullets,
+                        file_name="optimized_resume_bullets.txt",
+                        mime="text/plain",
+                    ):
+                        st.success("Downloaded!")

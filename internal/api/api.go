@@ -103,74 +103,126 @@ func (s *Server) handleMatch(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(scoredResume)
 }
 
+// Handler for transform endpoint
 func (s *Server) handleTransform(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
 		return
 	}
 
-	var request struct {
-		ScoredResume    *types.ScoredResume    `json:"scored_resume"`
-		ExtractedSkills *types.ExtractedSkills `json:"extracted_skills"`
-		MinScore        int                    `json:"min_score"`
-	}
-
-	if err := json.NewDecoder(r.Body).Decode(&request); err != nil {
-		http.Error(w, "Invalid request body", http.StatusBadRequest)
+	// Parse JSON directly from request body
+	var request types.TransformRequest
+	decoder := json.NewDecoder(r.Body)
+	if err := decoder.Decode(&request); err != nil {
+		http.Error(w, "Failed to parse request: "+err.Error(), http.StatusBadRequest)
 		return
 	}
 
-	if request.ScoredResume == nil {
-		http.Error(w, "No scored resume provided", http.StatusBadRequest)
-		return
-	}
-	if request.ExtractedSkills == nil {
+	extractedSkillsJSON := request.ExtractedSkills
+	if extractedSkillsJSON == "" {
 		http.Error(w, "No extracted skills provided", http.StatusBadRequest)
 		return
 	}
-	if request.MinScore <= 0 {
-		request.MinScore = 7 // Default minimum score
+
+	itemsJSON := request.Items
+	if itemsJSON == "" {
+		http.Error(w, "No items provided", http.StatusBadRequest)
+		return
 	}
-	//
-	// transformedResume, err := llm.TransformHighScoring(request.ScoredResume, request.ExtractedSkills, request.MinScore)
-	// if err != nil {
-	// 	http.Error(w, fmt.Sprintf("Failed to transform resume: %v", err), http.StatusInternalServerError)
-	// 	return
-	// }
-	//
-	// w.Header().Set("Content-Type", "application/json")
-	// json.NewEncoder(w).Encode(transformedResume)
+
+	emphasisLevel := request.EmphasisLevel
+	if emphasisLevel == "" {
+		emphasisLevel = "Moderate" // Default value
+	}
+
+	var extractedSkills types.ExtractedSkills
+	if err := json.Unmarshal([]byte(extractedSkillsJSON), &extractedSkills); err != nil {
+		http.Error(w, "Invalid extracted skills format", http.StatusBadRequest)
+		return
+	}
+
+	var items []types.TransformItem
+	if err := json.Unmarshal([]byte(itemsJSON), &items); err != nil {
+		http.Error(w, "Invalid items format", http.StatusBadRequest)
+		return
+	}
+
+	// Transform the items
+	transformedItems, err := llm.TransformResumeBullets(&extractedSkills, items, emphasisLevel)
+	if err != nil {
+		http.Error(w, fmt.Sprintf("Failed to transform resume: %v", err), http.StatusInternalServerError)
+		return
+	}
+
+	response := types.TransformResponse{
+		Items: transformedItems,
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(response)
 }
 
+// Handler for alternative endpoint
 func (s *Server) handleAlternative(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
 		return
 	}
 
-	var request struct {
-		BulletPoint    string   `json:"bullet_point"`
-		MatchingSkills []string `json:"matching_skills"`
-	}
-	if err := json.NewDecoder(r.Body).Decode(&request); err != nil {
-		http.Error(w, "Invalid request body", http.StatusBadRequest)
+	// Parse JSON directly from request body
+	var request types.AlternativeRequest
+	decoder := json.NewDecoder(r.Body)
+	if err := decoder.Decode(&request); err != nil {
+		http.Error(w, "Failed to parse request: "+err.Error(), http.StatusBadRequest)
 		return
 	}
-	if request.BulletPoint == "" {
-		http.Error(w, "No bullet point provided", http.StatusBadRequest)
+
+	extractedSkillsJSON := request.ExtractedSkills
+	if extractedSkillsJSON == "" {
+		http.Error(w, "No extracted skills provided", http.StatusBadRequest)
 		return
 	}
-	if len(request.MatchingSkills) == 0 {
+
+	originalText := request.OriginalText
+	if originalText == "" {
+		http.Error(w, "No original text provided", http.StatusBadRequest)
+		return
+	}
+
+	matchingSkillsJSON := request.MatchingSkills
+	if matchingSkillsJSON == "" {
 		http.Error(w, "No matching skills provided", http.StatusBadRequest)
 		return
 	}
 
-	alternative, err := llm.GenAlternative(request.BulletPoint, request.MatchingSkills)
+	emphasisLevel := request.EmphasisLevel
+	if emphasisLevel == "" {
+		emphasisLevel = "Moderate" // Default value
+	}
+
+	var extractedSkills types.ExtractedSkills
+	if err := json.Unmarshal([]byte(extractedSkillsJSON), &extractedSkills); err != nil {
+		http.Error(w, "Invalid extracted skills format", http.StatusBadRequest)
+		return
+	}
+
+	var matchingSkills []string
+	if err := json.Unmarshal([]byte(matchingSkillsJSON), &matchingSkills); err != nil {
+		http.Error(w, "Invalid matching skills format", http.StatusBadRequest)
+		return
+	}
+
+	// Generate alternative
+	alternativeText, err := llm.GenerateAlternativeBullet(&extractedSkills, originalText, matchingSkills, emphasisLevel)
 	if err != nil {
 		http.Error(w, fmt.Sprintf("Failed to generate alternative: %v", err), http.StatusInternalServerError)
 		return
 	}
 
+	response := types.AlternativeResponse{
+		AlternativeText: alternativeText,
+	}
+
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(map[string]string{"alternative": alternative})
+	json.NewEncoder(w).Encode(response)
 }
