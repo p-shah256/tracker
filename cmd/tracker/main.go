@@ -19,7 +19,7 @@ func main() {
 		slog.Error("Gemini API key not found in environment variables")
 		os.Exit(1)
 	}
-	server := api.NewServer(8080)
+	server, _ := api.NewServer(8080)
 	if err := server.Start(); err != nil {
 		slog.Error("Error starting API server", "error", err)
 		os.Exit(1)

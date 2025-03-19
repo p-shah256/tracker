@@ -1,26 +1,24 @@
 package types
 
-// ===== New types for the pipeline approach =====
-// ExtractedSkill represents a skill extracted from a job description
+// =============== Extraction TYPES ===============
 type ExtractedSkill struct {
 	Name    string `json:"name"`
 	Context string `json:"context"`
 }
 
-// CompanyInfo represents basic company and position information
 type CompanyInfo struct {
 	Name     string `json:"name"`
 	Position string `json:"position"`
 	Level    string `json:"level"`
 }
 
-// ExtractedSkills represents the output of the extraction engine
 type ExtractedSkills struct {
 	RequiredSkills   []ExtractedSkill `json:"required_skills"`
 	NiceToHaveSkills []ExtractedSkill `json:"nice_to_have_skills"`
 	CompanyInfo      CompanyInfo      `json:"company_info"`
 }
 
+// =============== scoring TYPES ===============
 type ScoredResume struct {
 	ProfessionalExperience []ExperienceEntry `json:"professional_experience"`
 	Projects               []ProjectEntry    `json:"projects"`
