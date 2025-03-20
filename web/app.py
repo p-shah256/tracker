@@ -55,12 +55,16 @@ def display_company_info(company_info: Dict[str, str]) -> None:
     st.write(f"**Level:** {company_info.get('level', 'N/A')}")
 
 def display_skills(skills: list, title: str) -> None:
-    """Display skills with their context."""
+    """Display skills with visual hierarchy and meaningful color coding."""
     st.write(f"{title}:")
+    
     for skill in skills:
-        st.write(f"- {skill['name']}")
+        imp = skill['importance']
+        color = "red" if imp < 3 else "green" if imp > 7 else "orange"
+        skill_line = f"**{skill['name']}** <span style='color:{color}'>●&nbsp;{imp}/10</span>"
         if skill.get("context"):
-            st.write(f"  *Context: {skill['context']}*")
+            skill_line += f" - *{skill['context']}*"
+        st.markdown(skill_line, unsafe_allow_html=True)
 
 def display_experience_highlights(highlights: list) -> None:
     """Display experience highlights with scores and reasoning."""
@@ -74,11 +78,17 @@ def display_experience_scores(experience_list: list) -> None:
     st.write("Experience Scores:")
     for exp in experience_list:
         with st.expander(f"{exp.get('company', '')} - {exp.get('position', '')}: {exp.get('score', 0):.1f}/10"):
+            st.write("Score Reasoning:")
+            st.write(exp.get("score_reasoning", ""))
             st.write("Matching Skills:")
             for skill in exp.get("matching_skills", []):
                 st.write(f"- {skill}")
+            st.write("Missing Skills:")
+            for skill in exp.get("missing_skills", []):
+                st.write(f"- {skill}")
             st.write("Highlights:")
             display_experience_highlights(exp.get("highlights", []))
+
 
 def display_project_scores(projects: list) -> None:
     """Display project scores with matching skills and highlights."""
@@ -90,11 +100,17 @@ def display_project_scores(projects: list) -> None:
     for proj in projects:
         title = proj.get("name", "Unnamed Project")
         with st.expander(f"- {title}: {proj.get('score', 0):.1f}/10"):
+            st.write("Score Reasoning:")
+            st.write(proj.get("score_reasoning", ""))
             st.write("Matching Skills:")
             for skill in proj.get("matching_skills", []):
                 st.write(f"- {skill}")
+            st.write("Missing Skills:")
+            for skill in proj.get("missing_skills", []):
+                st.write(f"- {skill}")
             st.write("Highlights:")
             display_experience_highlights(proj.get("highlights", []))
+
 
 def display_transformed_item(item: Dict[str, Any]) -> None:
     """Display a transformed item with original and optimized versions."""
@@ -134,48 +150,42 @@ def display_transformed_item(item: Dict[str, Any]) -> None:
             st.write(f"- Original: {item.get('char_count_original', 0)}")
             st.write(f"- New: {item.get('char_count_new', 0)}")
 
-def display_optimization_results(result: Dict[str, Any]) -> None:
+def display_scoring_results(result: Dict[str, Any]) -> None:
     """Display all optimization results."""
     st.subheader("Resume Scoring")
-    scored_resume = result.get("scoredResume", {})
 
     extracted_skills = result.get("extractedSkills", {})
     
-    st.metric("Overall Resume Score", f"{scored_resume.get('overall_score', 0):.1f}/10")
+    st.metric("Overall Resume Score", f"{result.get('overall_score', 0):.1f}/10")
     company_info = extracted_skills.get("company_info", {})
     display_company_info(company_info)
 
-    # no need to show extracted skills
-    # st.subheader("Extracted Skills")
-
-
-    # TODO: need to add overall comments on the resume, existing skills, missing skills, etc.
-    st.write(f"**Overall Comments:** {scored_resume.get('overall_comments', '')}")
+    st.write(f"**Overall Comments:** {result.get('overall_comments', '')}")
     col1, col2 = st.columns(2)
     with col1:
-        display_skills(scored_resume.get("missing_skills", []), "Missing Skills:")
+        display_skills(result.get("missing_skills", []), "Missing Skills:")
     with col2:
-        display_skills(scored_resume.get("existing_skills", []), "Existing Skills:")
+        display_skills(result.get("existing_skills", []), "Existing Skills:")
 
-    display_experience_scores(scored_resume.get("professional_experience", []))
-    display_project_scores(scored_resume.get("projects", []))
+    display_experience_scores(result.get("professional_experience", []))
+    display_project_scores(result.get("projects", []))
 
-    st.subheader("Suggested Optimizations Bullet Points")
-    transformed_items = result.get("transformItems", [])
-    for item in transformed_items:
-        display_transformed_item(item)
+    # st.subheader("Suggested Optimizations Bullet Points")
+    # transformed_items = result.get("transformItems", [])
+    # for item in transformed_items:
+    #     display_transformed_item(item)
 
-def handle_optimize_request(jd_text: str, resume_text: str) -> None:
+def handle_score(jd_text: str, resume_text: str) -> None:
     """Handle the optimization request."""
     with st.spinner("Optimizing your resume..."):
         try:
             response = requests.post(
-                f"{BACKEND_URL}/api/optimize",
+                f"{BACKEND_URL}/api/score",
                 json={"jobDescText": jd_text, "resume": resume_text}
             )
             response.raise_for_status()
             result = response.json()
-            display_optimization_results(result)
+            display_scoring_results(result)
         except requests.exceptions.RequestException as e:
             st.error(f"Error communicating with backend: {str(e)}")
         except Exception as e:
@@ -214,14 +224,14 @@ def render_main_app() -> None:
     col1, col2 = st.columns(2)
     with col1:
         st.subheader("Job Description")
-        jd_text = st.text_area("Paste the job description here", height=400)
+        jd_text = st.text_area("Paste the job description here, we don't care about formatting!", height=400)
 
     with col2:
         st.subheader("Your Resume")
-        resume_text = st.text_area("Paste your resume here", height=400)
+        resume_text = st.text_area("Paste your resume here, don't worry about formatting!", height=400)
 
-    if st.button("Optimize Resume"):
-        handle_optimize_request(jd_text, resume_text)
+    if st.button("Score Resume"):
+        handle_score(jd_text, resume_text)
 
 def main():
     """Main application entry point."""

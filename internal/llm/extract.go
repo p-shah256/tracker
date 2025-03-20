@@ -86,8 +86,7 @@ func (l *LLM) ScoreResume(extractedSkills *types.ExtractedSkills, resumeText str
 		return nil, fmt.Errorf("failed to marshal skills data: %w", err)
 	}
 
-	logger.Debug("skills data serialized", "json_size", len(skillsJSON))
-
+	// TODO: maybe later you can remove reasoning for each hightlight and just have a single score reasoning for the entire section
 	// TODO: add other items here, maybe just take everything like technical skills as well
 	prompt := fmt.Sprintf(`Score how each part of this resume matches the job requirements. Be brutally honest about what's missing or weak.
 	Job Requirements:
@@ -104,12 +103,14 @@ func (l *LLM) ScoreResume(extractedSkills *types.ExtractedSkills, resumeText str
 		  "position": "position title",
 		  "score": 8,
 		  "matching_skills": ["skill1", "skill2"],
+		  "score_reasoning": "WHY this scores poorly - be specific about what's missing or weak. Be brutal and honest around 2-3 sentences",
 		  "highlights": [
 			{
 			  "text": "original bullet point",
 			  "score": 7,
 			  "matching_skills": ["skill1"],
-			  "reasoning": "WHY this scores poorly - be specific about what's missing or weak"
+			  "reasoning": "WHY this scores poorly - be specific about what's missing or weak",
+			  "missing_skills": ["skill2"]
 			}
 		  ]
 		}
@@ -118,12 +119,14 @@ func (l *LLM) ScoreResume(extractedSkills *types.ExtractedSkills, resumeText str
 		"name": "project name",
 		"score": 8,
 		"matching_skills": ["skill1", "skill2"],
+		"score_reasoning": "WHY this scores poorly - be specific about what's missing or weak. Be brutal and honest around 2-3 sentences",
 		"highlights": [
 			{
 			  "text": "original bullet point",
 			  "score": 7,
 			  "matching_skills": ["skill1"],
-			  "reasoning": "WHY this scores poorly - be specific about what's missing or weak"
+			  "reasoning": "WHY this scores poorly - be specific about what's missing or weak",
+			  "missing_skills": ["skill2"]
 			}
 		  ]
 		}],
@@ -141,6 +144,8 @@ func (l *LLM) ScoreResume(extractedSkills *types.ExtractedSkills, resumeText str
 	  }],
 	}`, string(skillsJSON), resumeText)
 
+	logger.Debug("prompt", "prompt", prompt)
+
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 
@@ -154,8 +159,7 @@ func (l *LLM) ScoreResume(extractedSkills *types.ExtractedSkills, resumeText str
 	}
 
 	logger.Info("received LLM response",
-		"duration_ms", time.Since(startTime).Milliseconds(),
-		"response_length", len(content))
+		"duration_ms", time.Since(startTime).Milliseconds())
 
 	cleanResponse := clean.CleanLlmResponse(content)
 	var scoredResume types.ScoredResume

@@ -29,12 +29,16 @@ type ScoredResume struct {
 	ExistingSkills         []ExtractedSkill  `json:"existing_skills"`
 }
 
+// TODO: eventaully remove two diff entries and just have one
+// company postion does not matter does it?
 type ExperienceEntry struct {
 	Company        string      `json:"company"`
 	Position       string      `json:"position"`
 	Score          float64     `json:"score"`
 	MatchingSkills []string    `json:"matching_skills"`
 	Highlights     []Highlight `json:"highlights"`
+	ScoreReasoning string      `json:"score_reasoning"`
+	MissingSkills  []string    `json:"missing_skills"`
 }
 
 type ProjectEntry struct {
@@ -42,6 +46,8 @@ type ProjectEntry struct {
 	Score          float64     `json:"score"`
 	MatchingSkills []string    `json:"matching_skills"`
 	Highlights     []Highlight `json:"highlights"`
+	ScoreReasoning string      `json:"score_reasoning"`
+	MissingSkills  []string    `json:"missing_skills"`
 }
 
 type Highlight struct {
