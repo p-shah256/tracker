@@ -234,6 +234,7 @@ func (s *Server) handleOptimize(w http.ResponseWriter, r *http.Request) {
 				Position:          exp.Position,
 				OriginalScore:     highlight.Score,     // Renamed from Score
 				CharCountOriginal: len(highlight.Text), // Added this
+				Reasoning:         highlight.Reasoning,
 			})
 		}
 	}
@@ -249,6 +250,7 @@ func (s *Server) handleOptimize(w http.ResponseWriter, r *http.Request) {
 				Name:              proj.Name,
 				OriginalScore:     highlight.Score,
 				CharCountOriginal: len(highlight.Text),
+				Reasoning: highlight.Reasoning,
 			})
 		}
 	}

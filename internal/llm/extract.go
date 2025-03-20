@@ -212,6 +212,7 @@ func (l *LLM) TransformResumeBullets(extractedSkills *types.ExtractedSkills, ite
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 
+	slog.Debug("sending this prompt for transform", "prompt", prompt)
 	content, err := l.Generate(ctx, "You are a resume optimization expert who helps tailor resumes to specific job descriptions.", prompt)
 	if err != nil {
 		return nil, fmt.Errorf("resume transformation failed: %w", err)

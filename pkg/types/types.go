@@ -44,7 +44,7 @@ type Highlight struct {
 	Text           string   `json:"text"`
 	Score          float64  `json:"score"`
 	MatchingSkills []string `json:"matching_skills"`
-	Reasoning      string   `json:"reasoning",omitempty`
+	Reasoning      string   `json:"reasoning,omitempty"`
 }
 
 // ScoredHighlight represents a scored resume bullet point
