@@ -44,6 +44,7 @@ type Highlight struct {
 	Text           string   `json:"text"`
 	Score          float64  `json:"score"`
 	MatchingSkills []string `json:"matching_skills"`
+	Reasoning      string   `json:"reasoning",omitempty`
 }
 
 // ScoredHighlight represents a scored resume bullet point
@@ -116,6 +117,8 @@ type TransformItem struct {
 	Company           string   `json:"company,omitempty"`
 	Position          string   `json:"position,omitempty"`
 	Name              string   `json:"name,omitempty"`
+	Reasoning         string   `json:"reasoning,omitempty"`
+	ImprovementExp    string   `json:"improvement_explanation,omitempty"`
 }
 
 type TransformResponse struct {

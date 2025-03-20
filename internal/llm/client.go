@@ -53,7 +53,7 @@ func (l *LLM) Generate(ctx context.Context, systemPrompt, userPrompt string) (st
 		return "", fmt.Errorf("LLM call failed: %w", err)
 	}
 
-	slog.Info("LLM API call",
+	slog.Info("LLM API call completed",
 		"input_tokens", resp.UsageMetadata.PromptTokenCount,
 		"output_tokens", resp.UsageMetadata.CandidatesTokenCount,
 		"total_tokens", resp.UsageMetadata.TotalTokenCount)

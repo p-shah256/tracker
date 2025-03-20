@@ -242,14 +242,13 @@ func (s *Server) handleOptimize(w http.ResponseWriter, r *http.Request) {
 		for _, highlight := range proj.Highlights {
 			// Inside the loops:
 			itemsToTransform = append(itemsToTransform, types.TransformItem{
-				ID:             fmt.Sprintf("exp-%s-%d", proj.Name, len(itemsToTransform)),
-				OriginalText:   highlight.Text,
-				OriginalSkills: highlight.MatchingSkills, // Note this name change
-				Section:        "projects",
-				// Company:           .Company,
-				// Position:          exp.Position,
-				OriginalScore:     highlight.Score,     // Renamed from Score
-				CharCountOriginal: len(highlight.Text), // Added this
+				ID:                fmt.Sprintf("proj-%s-%d", proj.Name, len(itemsToTransform)),
+				OriginalText:      highlight.Text,
+				OriginalSkills:    highlight.MatchingSkills,
+				Section:           "projects",
+				Name:              proj.Name,
+				OriginalScore:     highlight.Score,
+				CharCountOriginal: len(highlight.Text),
 			})
 		}
 	}

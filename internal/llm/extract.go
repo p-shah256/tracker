@@ -20,22 +20,20 @@ func (l *LLM) ExtractSkills(jobDescContent string) (*types.ExtractedSkills, erro
 	relevantContent := clean.CleanHTML(jobDescContent)
 	logger.Debug("cleaned HTML content", "original_length", len(jobDescContent), "cleaned_length", len(relevantContent))
 
-	prompt := `Analyze this job description as if you were a professional resume writer identifying EVERY POSSIBLE keyword that could be used to match a candidate to this role. Extract:
-		1. Technical skills (explicit AND implied from job duties)
-		2. Software/tools mentioned
-		3. Methodologies/processes described
-		4. Soft skills required
-		5. Industry-specific terminology
-		6. Domain knowledge areas
-		7. Responsibilities that imply specific skills
-		Be THOROUGH and AGGRESSIVE in your extraction - don't just look for explicit "skill" words, but identify ALL competencies someone would need to do this job well.
-		Format as a prioritized JSON with:
+	prompt := `Parse this job description and extract EVERY keyword that could help match a candidate. Be aggressive and thorough:
+		1. Technical skills (both stated and implied)
+		2. Software/tools 
+		3. Methodologies/processes
+		4. Domain expertise areas
+		5. Industry terminology
+
+		Format as JSON:
 		{
 		  "required_skills": [
-			{"name": "skill", "context": "exact text where this skill was mentioned or implied", "importance": 1-10}
+			{"name": "skill", "context": "exact text where mentioned", "importance": 1-10}
 		  ],
 		  "nice_to_have_skills": [
-			{"name": "skill", "context": "exact text where this skill was mentioned or implied", "importance": 1-10}
+			{"name": "skill", "context": "exact text where mentioned", "importance": 1-10}
 		  ],
 		  "company_info": {
 			"name": "company name",
@@ -97,49 +95,46 @@ func (l *LLM) ScoreResume(extractedSkills *types.ExtractedSkills, resumeText str
 	logger.Debug("skills data serialized", "json_size", len(skillsJSON))
 
 	// TODO: add other items here, maybe just take everything like technical skills as well
-	prompt := fmt.Sprintf(`For each experience entry in my resume, identify which skills/requirements from the job description it addresses. 
-    Score each entry 1-10 on relevance, where 10 means it perfectly matches what the employer is looking for.
-    Also calculate an overall match score for the entire resume.
+	prompt := fmt.Sprintf(`Score how each part of this resume matches the job requirements. Be brutally honest about what's missing or weak.
+	Job Requirements:
+	%s
 
-    Job Requirements:
-    %s
+	Resume:
+	%s
 
-    My Resume:
-    %s
-
-    Return the result as a JSON object with the following structure:
-    {
-      "professional_experience": [
-        {
-          "company": "company name",
-          "position": "position title",
-          "score": 8,
-          "matching_skills": ["skill1", "skill2"],
-          "highlights": [
-            {
-              "text": "original bullet point",
-              "score": 7,
-              "matching_skills": ["skill1"]
-            }
-          ]
-        }
-      ],
-      "projects": [
-        {
-          "name": "project name",
-          "score": 9,
-          "matching_skills": ["skill1", "skill3"],
-          "highlights": [
-            {
-              "text": "original bullet point",
-              "score": 8,
-              "matching_skills": ["skill1", "skill3"]
-            }
-          ]
-        }
-      ],
-      "overall_score": 7.5
-    }`, string(skillsJSON), resumeText)
+	Return as JSON:
+	{
+	  "professional_experience": [
+		{
+		  "company": "company name",
+		  "position": "position title",
+		  "score": 8,
+		  "matching_skills": ["skill1", "skill2"],
+		  "highlights": [
+			{
+			  "text": "original bullet point",
+			  "score": 7,
+			  "matching_skills": ["skill1"],
+			  "reasoning": "WHY this scores poorly - be specific about what's missing or weak"
+			}
+		  ]
+		}
+	  ],
+	  "projects": [{
+		"name": "project name",
+		"score": 8,
+		"matching_skills": ["skill1", "skill2"],
+		"highlights": [
+			{
+			  "text": "original bullet point",
+			  "score": 7,
+			  "matching_skills": ["skill1"],
+			  "reasoning": "WHY this scores poorly - be specific about what's missing or weak"
+			}
+		  ]
+		}],
+	  "overall_score": 7.5
+	}`, string(skillsJSON), resumeText)
 
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
@@ -186,40 +181,34 @@ func (l *LLM) TransformResumeBullets(extractedSkills *types.ExtractedSkills, ite
 		return nil, fmt.Errorf("failed to marshal items data: %w", err)
 	}
 
-	prompt := fmt.Sprintf(`Transform these resume bullet points to better match the job requirements while sounding like a real human wrote them.
-		For each bullet point:
-		1. KEEP THE SAME CHARACTER COUNT (±10 percent) - this is critical
-		2. Preserve the original achievement metrics but make them relevant to the job
-		3. Use language that demonstrates competence in the SPECIFIC skills needed for this job
-		4. Sound like a professional in this field, not an HR robot
-		5. Maintain the original voice and style
-		6. Score how much better the new version matches the job (1-10)
+	prompt := fmt.Sprintf(`Rewrite these resume bullets to make them job-targeted weapons. For each:
+		1. Address the specific weakness identified in "reasoning"
+		2. Stay within ±25%% character count
+		3. Keep original metrics but make them relevant
+		4. Front-load with technical achievements using job-specific language
+		5. Sound like an actual human professional, not HR-speak
+
 		Job Requirements:
 		%s
 
-		Bullet Points to Transform:
+		Bullets to Transform:
 		%s
 
-		Return as a JSON array with:
+		Return as JSON array:
 		{
-			"id": "original id",
-			"original_text": "the original text",
-			"transformed_text": "the rewritten text", 
-			"char_count_original": 120,
-			"char_count_new": 115,
-			"original_skills": ["skills already in the bullet"],
-			"added_skills": ["new skills emphasized"],
-			"original_score": 5,
-			"new_score": 8,
-			"section": "original section",
-			"company": "original company",
-			"position": "original position",
-			"name": "original name if available"
-		}
+		  "id": "original id",
+		  "original_text": "original text",
+		  "transformed_text": "rewritten text", 
+		  "char_count_original": 120,
+		  "char_count_new": 115,
+		  "original_skills": ["skills already in bullet"],
+		  "added_skills": ["new skills emphasized"],
+		  "original_score": 5,
+		  "new_score": 8,
+		  "reasoning": "original reasoning for low score",
+		  "improvement_explanation": "how this rewrite addresses the weaknesses"
+		}`, string(skillsJSON), string(itemsJSON))
 
-		CRUCIAL: The bullet must sound natural and authentic - avoid corporate speak, buzzword salad, or awkward keyword stuffing. It should read like it was written by an actual professional in this field, not an AI.`, string(skillsJSON), string(itemsJSON))
-
-	slog.Info("sending this prompt", "prompt",prompt)
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 
