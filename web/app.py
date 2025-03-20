@@ -2,13 +2,33 @@ import streamlit as st
 import requests
 import json
 from typing import Dict, Any
+import os
+from dotenv import load_dotenv
 
-# Define users
+# Load environment variables
+load_dotenv()
+
+# Get backend URL from environment variable
+BACKEND_URL = os.getenv("BACKEND_URL", "http://localhost:8080")
+
+# Define users from environment variables
 USERS = {
-    "admin": {"password": "admin123", "role": "admin"},
-    "user1": {"password": "user123", "role": "user"},
-    "user2": {"password": "user456", "role": "user"}
+    os.getenv("ADMIN_USERNAME"): {
+        "password": os.getenv("ADMIN_PASSWORD"),
+        "role": os.getenv("ADMIN_ROLE")
+    },
+    os.getenv("USER1_USERNAME"): {
+        "password": os.getenv("USER1_PASSWORD"),
+        "role": os.getenv("USER1_ROLE")
+    },
+    os.getenv("USER2_USERNAME"): {
+        "password": os.getenv("USER2_PASSWORD"),
+        "role": os.getenv("USER2_ROLE")
+    }
 }
+
+# Remove any None values from USERS dict
+USERS = {k: v for k, v in USERS.items() if k and v["password"] and v["role"]}
 
 def initialize_session_state():
     """Initialize session state variables."""
@@ -140,29 +160,17 @@ def display_optimization_results(result: Dict[str, Any]) -> None:
         display_transformed_item(item)
 
 def handle_optimize_request(jd_text: str, resume_text: str) -> None:
-    """Handle the optimize resume request and display results."""
-    if not jd_text or not resume_text:
-        st.error("Please provide both job description and resume text.")
-        return
-
-    with st.spinner("Optimizing your resume..."):
-        try:
-            payload = {"jobDescText": jd_text, "resume": resume_text}
-            response = requests.post(
-                "http://localhost:8080/api/optimize",
-                json=payload,
-                headers={"Content-Type": "application/json"},
-            )
-
-            if response.status_code != 200:
-                st.error(f"Error: {response.status_code} - {response.text}")
-                return
-
-            result = response.json()
-            display_optimization_results(result)
-
-        except Exception as e:
-            st.error(f"An error occurred: {str(e)}")
+    """Handle the optimization request."""
+    try:
+        response = requests.post(
+            f"{BACKEND_URL}/api/optimize",
+            json={"jd": jd_text, "resume": resume_text}
+        )
+        response.raise_for_status()
+        result = response.json()
+        display_optimization_results(result)
+    except requests.exceptions.RequestException as e:
+        st.error(f"Error communicating with backend: {str(e)}")
 
 def render_login_page() -> None:
     """Render the login page."""
