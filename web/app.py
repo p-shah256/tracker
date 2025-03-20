@@ -164,7 +164,7 @@ def handle_optimize_request(jd_text: str, resume_text: str) -> None:
     try:
         response = requests.post(
             f"{BACKEND_URL}/api/optimize",
-            json={"jd": jd_text, "resume": resume_text}
+            json={"jobDescText": jd_text, "resume": resume_text}
         )
         response.raise_for_status()
         result = response.json()

@@ -19,5 +19,4 @@ USER appuser
 # Expose Streamlit port
 EXPOSE 8501
 
-# Run with basic production settings
-CMD ["streamlit", "run", "app.py", "--server.address=0.0.0.0", "--server.enableCORS=false", "--server.enableXsrfProtection=true"]
+CMD ["streamlit", "run", "app.py", "--server.address=0.0.0.0", "--server.enableCORS=false", "--server.enableXsrfProtection=false"]

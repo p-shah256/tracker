@@ -26,11 +26,21 @@ deploy() {
     
     if [ "$1" == "--rebuild" ]; then
         echo "Rebuilding containers..."
-        docker-compose down
-        docker-compose build --no-cache
+        if ! docker-compose down; then
+            echo "Error: Failed to bring down containers"
+            exit 1
+        fi
+        
+        if ! docker-compose build --no-cache; then
+            echo "Error: Build failed"
+            exit 1
+        fi
     fi
     
-    docker-compose up -d
+    if ! docker-compose up -d; then
+        echo "Error: Failed to start containers"
+        exit 1
+    fi
     
     echo "Application deployed successfully!"
     echo "Frontend: http://localhost:8501"

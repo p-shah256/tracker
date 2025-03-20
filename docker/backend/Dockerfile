@@ -10,5 +10,6 @@ RUN CGO_ENABLED=0 GOOS=linux go build -o tracker ./cmd/tracker
 FROM alpine:latest
 WORKDIR /app
 COPY --from=builder /app/tracker .
+COPY .env .
 EXPOSE 8080
 CMD ["./tracker"]
