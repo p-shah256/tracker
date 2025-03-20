@@ -95,14 +95,13 @@ func (l *LLM) ScoreResume(extractedSkills *types.ExtractedSkills, resumeText str
 	Resume:
 	%s
 
-	Response must be a VALID JSON:
+	Return valid JSON without any formatting or tab characters, ensuring all string values are properly escaped:
 	{
 	  "overall_score": 7.5,
-	  "overall_comments": "overall comments on the resume, existing skills, missing skills, etc. (in 4-5 sentences)",
-	  "what_to_improve": "overall commnets on how to improve chances of getting the job",
+	  "overall_comments": "overall comments on the resume, existing skills, missing skills, etc. (in 3-4 sentences)",
 	  "sections": [
 		{
-	  	"name": "if experience = 'company-position', else 'project name', ignore others for now",
+	  	"name": "if experience = 'company-position', else 'project name' (ignore others for now)",
 		  "score": 8,
 		  "score_reasoning": "WHY this scores poorly - be specific about what's missing or weak. Be brutal and honest. Be detailed enough to use this reasoning to optimize the resume. Be detailed enough so that it can be used to optimize the resume.",
 		  "original_content": "original content of the item",
@@ -173,7 +172,7 @@ func (l *LLM) TransformResumeBullets(scored *types.Section) (types.TransformResp
 			"original_score": 5,
 			"new_score": 8,
 			}, ...]
-		"improvement_explanation": "how this rewrite addresses the weaknesses of this section"
+		"improvement_explanation": "how this rewrite addresses the weaknesses of this section (2-3 sentences)"
 		}`, string(sectionStr))
 
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)

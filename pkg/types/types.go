@@ -24,7 +24,6 @@ type ScoredResume struct {
 	Sections        []Section `json:"sections"`
 	OverallScore    float64   `json:"overall_score"`
 	OverallComments string    `json:"overall_comments"`
-	WhatToImprove   string    `json:"what_to_improve"`
 	PositionLevel   string    `json:"position_level"`
 }
 
