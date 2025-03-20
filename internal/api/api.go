@@ -239,6 +239,7 @@ func (s *Server) handleOptimize(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
+	// TODO: do this twice, once for projects and once for experiecnce
 	for _, proj := range scored.Projects {
 		for _, highlight := range proj.Highlights {
 			// Inside the loops:

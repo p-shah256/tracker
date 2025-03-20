@@ -15,7 +15,7 @@ func (l *LLM) ExtractSkills(jobDescContent string) (*types.ExtractedSkills, erro
 		"component", "llm",
 		"operation", "extract_skills",
 	)
-	logger.Info("starting skill extraction", "content_length", len(jobDescContent))
+	logger.Info("starting skill extraction")
 
 	relevantContent := clean.CleanHTML(jobDescContent)
 	logger.Debug("cleaned HTML content", "original_length", len(jobDescContent), "cleaned_length", len(relevantContent))
@@ -53,14 +53,9 @@ func (l *LLM) ExtractSkills(jobDescContent string) (*types.ExtractedSkills, erro
 		return nil, fmt.Errorf("skill extraction failed: %w", err)
 	}
 	logger.Info("received LLM response",
-		"duration_ms", time.Since(startTime).Milliseconds(),
-		"response_length", len(content))
+		"duration_ms", time.Since(startTime).Milliseconds())
 
 	cleanResponse := clean.CleanLlmResponse(content)
-	logger.Debug("cleaned LLM response",
-		"original_length", len(content),
-		"cleaned_length", len(cleanResponse))
-
 	var extractedSkills types.ExtractedSkills
 	if err := json.Unmarshal([]byte(cleanResponse), &extractedSkills); err != nil {
 		logger.Error("JSON parsing failed", "error", err, "content", cleanResponse)
@@ -82,7 +77,6 @@ func (l *LLM) ScoreResume(extractedSkills *types.ExtractedSkills, resumeText str
 	)
 
 	logger.Info("starting resume scoring",
-		"resume_length", len(resumeText),
 		"required_skills", len(extractedSkills.RequiredSkills),
 		"nice_to_have_skills", len(extractedSkills.NiceToHaveSkills))
 
