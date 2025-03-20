@@ -2,9 +2,9 @@ package types
 
 // =============== Extraction TYPES ===============
 type ExtractedSkill struct {
-	Name       string `json:"name"`
-	Context    string `json:"context"`
-	Importance int    `json:"importance"`
+	Name string `json:"name"`
+	// Context    string `json:"context"`
+	Importance int `json:"importance"`
 }
 
 type CompanyInfo struct {
@@ -21,139 +21,39 @@ type ExtractedSkills struct {
 
 // =============== scoring TYPES ===============
 type ScoredResume struct {
-	ProfessionalExperience []ExperienceEntry `json:"professional_experience"`
-	Projects               []ProjectEntry    `json:"projects"`
-	OverallScore           float64           `json:"overall_score"`
-	OverallComments        string            `json:"overall_comments"`
-	MissingSkills          []ExtractedSkill  `json:"missing_skills"`
-	ExistingSkills         []ExtractedSkill  `json:"existing_skills"`
+	Sections        []Section `json:"sections"`
+	OverallScore    float64   `json:"overall_score"`
+	OverallComments string    `json:"overall_comments"`
+	WhatToImprove   string    `json:"what_to_improve"`
+	PositionLevel   string    `json:"position_level"`
 }
 
-// TODO: eventaully remove two diff entries and just have one
-// company postion does not matter does it?
-type ExperienceEntry struct {
-	Company        string      `json:"company"`
-	Position       string      `json:"position"`
-	Score          float64     `json:"score"`
-	MatchingSkills []string    `json:"matching_skills"`
-	Highlights     []Highlight `json:"highlights"`
-	ScoreReasoning string      `json:"score_reasoning"`
-	MissingSkills  []string    `json:"missing_skills"`
+type Section struct {
+	Name            string           `json:"name"`
+	Score           float64          `json:"score"`
+	ScoreReasoning  string           `json:"score_reasoning"`
+	MissingSkills   []ExtractedSkill `json:"missing_skills,omitempty"`
+	OriginalContent string           `json:"original_content"`
 }
 
-type ProjectEntry struct {
-	Name           string      `json:"name"`
-	Score          float64     `json:"score"`
-	MatchingSkills []string    `json:"matching_skills"`
-	Highlights     []Highlight `json:"highlights"`
-	ScoreReasoning string      `json:"score_reasoning"`
-	MissingSkills  []string    `json:"missing_skills"`
-}
-
-type Highlight struct {
-	Text           string   `json:"text"`
-	Score          float64  `json:"score"`
-	MatchingSkills []string `json:"matching_skills"`
-	Reasoning      string   `json:"reasoning,omitempty"`
-}
-
-// ScoredHighlight represents a scored resume bullet point
-type ScoredHighlight struct {
-	Text           string   `json:"text"`
-	Score          int      `json:"score"`
-	MatchingSkills []string `json:"matching_skills"`
-}
-
-// ScoredExperienceItem represents a scored professional experience entry
-type ScoredExperienceItem struct {
-	Company        string            `json:"company"`
-	Position       string            `json:"position"`
-	Score          int               `json:"score"`
-	MatchingSkills []string          `json:"matching_skills"`
-	Highlights     []ScoredHighlight `json:"highlights"`
-}
-
-// ScoredProjectItem represents a scored project entry
-type ScoredProjectItem struct {
+type TransformResponse struct {
 	Name           string            `json:"name"`
-	Score          int               `json:"score"`
-	MatchingSkills []string          `json:"matching_skills"`
-	Highlights     []ScoredHighlight `json:"highlights"`
+	Items          []TransformedItem `json:"items"`
+	ImprovementExp string            `json:"improvement_explanation,omitempty"`
 }
 
-// TransformedHighlight represents a transformed resume bullet point
-type TransformedHighlight struct {
-	Original         string   `json:"original"`
-	Transformed      string   `json:"transformed"`
-	EmphasizedSkills []string `json:"emphasized_skills"`
-}
-
-// TransformedExperienceItem represents a transformed professional experience entry
-type TransformedExperienceItem struct {
-	Company    string                 `json:"company"`
-	Position   string                 `json:"position"`
-	Highlights []TransformedHighlight `json:"highlights"`
-}
-
-// TransformedProjectItem represents a transformed project entry
-type TransformedProjectItem struct {
-	Name       string                 `json:"name"`
-	Highlights []TransformedHighlight `json:"highlights"`
-}
-
-// TransformedResume represents the output of the transformation engine
-type TransformedResume struct {
-	ProfessionalExperience []TransformedExperienceItem `json:"professional_experience"`
-	Projects               []TransformedProjectItem    `json:"projects"`
-}
-
-type TransformRequest struct {
-	ExtractedSkills string `json:"extractedSkills"`
-	Items           string `json:"items"`
-	EmphasisLevel   string `json:"emphasisLevel"`
-}
-
-type TransformItem struct {
-	ID                string   `json:"id"`
-	OriginalText      string   `json:"original_text"`
-	TransformedText   string   `json:"transformed_text,omitempty"`
+type TransformedItem struct {
+	OriginalBullet    string   `json:"original_bullet"`
+	TransformedBullet string   `json:"transformed_bullet,omitempty"`
 	CharCountOriginal int      `json:"char_count_original"`
 	CharCountNew      int      `json:"char_count_new,omitempty"`
 	OriginalSkills    []string `json:"original_skills"`
 	AddedSkills       []string `json:"added_skills,omitempty"`
 	OriginalScore     float64  `json:"original_score"`
 	NewScore          float64  `json:"new_score,omitempty"`
-	Section           string   `json:"section"`
-	Company           string   `json:"company,omitempty"`
-	Position          string   `json:"position,omitempty"`
-	Name              string   `json:"name,omitempty"`
-	Reasoning         string   `json:"reasoning,omitempty"`
-	ImprovementExp    string   `json:"improvement_explanation,omitempty"`
 }
 
-type TransformResponse struct {
-	Items []TransformItem `json:"items"`
-}
-
-type AlternativeRequest struct {
-	ExtractedSkills string `json:"extractedSkills"`
-	OriginalText    string `json:"originalText"`
-	MatchingSkills  string `json:"matchingSkills"`
-	EmphasisLevel   string `json:"emphasisLevel"`
-}
-
-type AlternativeResponse struct {
-	AlternativeText string `json:"alternative_text"`
-}
-
-// single EP types
 type OptimizeRequest struct {
 	JobDescText string `json:"jobDescText"`
 	Resume      string `json:"resume"`
-}
-
-type OptimizeResponse struct {
-	ExtractedSkills  ExtractedSkills `json:"extractedSkills"`
-	ScoredResume     ScoredResume    `json:"scoredResume"`
-	TransformedItems []TransformItem `json:"transformItems"`
 }

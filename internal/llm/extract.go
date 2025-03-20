@@ -30,10 +30,10 @@ func (l *LLM) ExtractSkills(jobDescContent string) (*types.ExtractedSkills, erro
 		Format as JSON:
 		{
 		  "required_skills": [
-			{"name": "skill", "context": "exact text where mentioned", "importance": 1-10}
+			{"name": "skill", "importance": 1-10}
 		  ],
 		  "nice_to_have_skills": [
-			{"name": "skill", "context": "exact text where mentioned", "importance": 1-10}
+			{"name": "skill", "importance": 1-10}
 		  ],
 		  "company_info": {
 			"name": "company name",
@@ -95,53 +95,20 @@ func (l *LLM) ScoreResume(extractedSkills *types.ExtractedSkills, resumeText str
 	Resume:
 	%s
 
-	Return as JSON:
+	Response must be a VALID JSON:
 	{
-	  "professional_experience": [
+	  "overall_score": 7.5,
+	  "overall_comments": "overall comments on the resume, existing skills, missing skills, etc. (in 4-5 sentences)",
+	  "what_to_improve": "overall commnets on how to improve chances of getting the job",
+	  "sections": [
 		{
-		  "company": "company name",
-		  "position": "position title",
+	  	"name": "if experience = 'company-position', else 'project name', ignore others for now",
 		  "score": 8,
-		  "matching_skills": ["skill1", "skill2"],
-		  "score_reasoning": "WHY this scores poorly - be specific about what's missing or weak. Be brutal and honest around 2-3 sentences",
-		  "highlights": [
-			{
-			  "text": "original bullet point",
-			  "score": 7,
-			  "matching_skills": ["skill1"],
-			  "reasoning": "WHY this scores poorly - be specific about what's missing or weak",
-			  "missing_skills": ["skill2"]
-			}
-		  ]
+		  "score_reasoning": "WHY this scores poorly - be specific about what's missing or weak. Be brutal and honest. Be detailed enough to use this reasoning to optimize the resume. Be detailed enough so that it can be used to optimize the resume.",
+		  "original_content": "original content of the item",
+		  "missing_skills": [{ "name": "skill1", "importance": 1-10 (same as job requirements) }],
 		}
 	  ],
-	  "projects": [{
-		"name": "project name",
-		"score": 8,
-		"matching_skills": ["skill1", "skill2"],
-		"score_reasoning": "WHY this scores poorly - be specific about what's missing or weak. Be brutal and honest around 2-3 sentences",
-		"highlights": [
-			{
-			  "text": "original bullet point",
-			  "score": 7,
-			  "matching_skills": ["skill1"],
-			  "reasoning": "WHY this scores poorly - be specific about what's missing or weak",
-			  "missing_skills": ["skill2"]
-			}
-		  ]
-		}],
-	  "overall_score": 7.5,
-	  "overall_comments": "overall comments on the resume, existing skills, missing skills, etc. (in 2-3 sentences)",	
-	  "missing_skills": [{
-		  "name": "skill1",
-		  "context": "exact text where mentioned",
-		  "importance": 1-10
-		}],
-	  "existing_skills": [{
-		"name": "skill1",
-		"context": "exact text where mentioned",
-		"importance": 1-10
-	  }],
 	}`, string(skillsJSON), resumeText)
 
 	logger.Debug("prompt", "prompt", prompt)
@@ -170,29 +137,17 @@ func (l *LLM) ScoreResume(extractedSkills *types.ExtractedSkills, resumeText str
 		return nil, fmt.Errorf("failed to parse LLM response as JSON: %w", err)
 	}
 
+	logger.Debug("parsed LLM response", "scored_resume", scoredResume)
+
 	return &scoredResume, nil
 }
 
-func (l *LLM) TransformResumeBullets(scored *types.ScoredResume, items []types.TransformItem) ([]types.TransformItem, error) {
-	for i := range items {
-		if items[i].ID == "" {
-			items[i].ID = fmt.Sprintf("%d", i+1)
-		}
-	}
-
+func (l *LLM) TransformResumeBullets(scored *types.Section) (types.TransformResponse, error) {
 	// only send missing skills and existing skills, and overall comments instead of sending all the extracted skills
-	scoredJSON, err := json.Marshal(types.ScoredResume{
-		MissingSkills:   scored.MissingSkills,
-		ExistingSkills:  scored.ExistingSkills,
-		OverallComments: scored.OverallComments,
-	})
+	// section has all the items required
+	sectionStr, err := json.Marshal(*scored)
 	if err != nil {
-		return nil, fmt.Errorf("failed to marshal skills data: %w", err)
-	}
-
-	itemsJSON, err := json.Marshal(items)
-	if err != nil {
-		return nil, fmt.Errorf("failed to marshal items data: %w", err)
+		return types.TransformResponse{}, fmt.Errorf("failed to marshal section data: %w", err)
 	}
 
 	prompt := fmt.Sprintf(`Transform these resume bullets to exactly match the job requirements, regardless of original content:
@@ -202,26 +157,24 @@ func (l *LLM) TransformResumeBullets(scored *types.ScoredResume, items []types.T
 		4. Stay within ±25%% of original character count
 		5. Start with strong action verbs
 
-		Job Requirements:
-		%s
-
-		Bullets to Transform:
+		Section to transform:
 		%s
 
 		Return as JSON array:
 		{
-		"id": "original id",
-		"original_text": "original text",
-		"transformed_text": "rewritten text", 
-		"char_count_original": 120,
-		"char_count_new": 115,
-		"original_skills": ["skills already in bullet"],
-		"added_skills": ["new skills emphasized"],
-		"original_score": 5,
-		"new_score": 8,
-		"reasoning": "original reasoning for low score",
-		"improvement_explanation": "how this rewrite addresses the weaknesses"
-		}`, string(scoredJSON), string(itemsJSON))
+		"name": "name of section",
+		"items": [{
+			"original_bullet": "original text",
+			"transformed_bullet": "rewritten text", 
+			"char_count_original": 120,
+			"char_count_new": 115,
+			"original_skills": ["skills already in bullet"],
+			"added_skills": ["new skills emphasized"],
+			"original_score": 5,
+			"new_score": 8,
+			}, ...]
+		"improvement_explanation": "how this rewrite addresses the weaknesses of this section"
+		}`, string(sectionStr))
 
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
@@ -230,14 +183,14 @@ func (l *LLM) TransformResumeBullets(scored *types.ScoredResume, items []types.T
 	slog.Debug("prompt", "prompt", prompt)
 	content, err := l.Generate(ctx, "You are a resume optimization expert who helps tailor resumes to specific job descriptions.", prompt)
 	if err != nil {
-		return nil, fmt.Errorf("resume transformation failed: %w", err)
+		return types.TransformResponse{}, fmt.Errorf("resume transformation failed: %w", err)
 	}
 
 	cleanResponse := clean.CleanLlmResponse(content)
 
-	var transformedItems []types.TransformItem
+	var transformedItems types.TransformResponse
 	if err := json.Unmarshal([]byte(cleanResponse), &transformedItems); err != nil {
-		return nil, fmt.Errorf("failed to parse LLM response as JSON: %w", err)
+		return types.TransformResponse{}, fmt.Errorf("failed to parse LLM response as JSON: %w", err)
 	}
 
 	return transformedItems, nil

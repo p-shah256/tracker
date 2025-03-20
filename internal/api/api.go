@@ -41,7 +41,6 @@ func enableCORS(next http.HandlerFunc) http.HandlerFunc {
 }
 
 func (s *Server) Start() error {
-	// http.HandleFunc("/api/optimize", enableCORS(s.handleOptimize))
 	http.HandleFunc("/api/score", enableCORS(s.handleScore))
 	http.HandleFunc("/api/transformSection", enableCORS(s.handleTransformSection))
 
@@ -94,6 +93,26 @@ func (s *Server) handleTransformSection(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
+	// get the section to transform from request
+	var req types.Section
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		slog.Error("Failed to parse request", "err", err)
+		http.Error(w, "Bad request", http.StatusBadRequest)
+		return
+	}
+
+	transformedItems, err := s.llmClient.TransformResumeBullets(&req)
+	if err != nil {
+		slog.Error("Transform failed", "err", err)
+		http.Error(w, "Transform failed", http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	if err := json.NewEncoder(w).Encode(transformedItems); err != nil {
+		slog.Error("Response encoding failed", "err", err)
+		return
+	}
 }
 
 // func (s *Server) handleOptimize(w http.ResponseWriter, r *http.Request) {

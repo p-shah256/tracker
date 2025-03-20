@@ -48,12 +48,6 @@ def check_login(username: str, password: str) -> bool:
         return True
     return False
 
-def display_company_info(company_info: Dict[str, str]) -> None:
-    """Display company information."""
-    st.write(f"**Company:** {company_info.get('name', 'N/A')}")
-    st.write(f"**Position:** {company_info.get('position', 'N/A')}")
-    st.write(f"**Level:** {company_info.get('level', 'N/A')}")
-
 def display_skills(skills: list, title: str) -> None:
     """Display skills with visual hierarchy and meaningful color coding."""
     st.write(f"{title}:")
@@ -73,44 +67,18 @@ def display_experience_highlights(highlights: list) -> None:
         if highlight.get("reasoning"):
             st.write(f"  *Reasoning: {highlight.get('reasoning')}*")
 
-def display_experience_scores(experience_list: list) -> None:
+def display_entry(experience_list: list) -> None:
     """Display experience scores with matching skills and highlights."""
-    st.write("Experience Scores:")
+    st.write("Sections:")
     for exp in experience_list:
-        with st.expander(f"{exp.get('company', '')} - {exp.get('position', '')}: {exp.get('score', 0):.1f}/10"):
+        with st.expander(f"{exp.get('name', '')}: {exp.get('score', 0):.1f}/10"):
             st.write("Score Reasoning:")
             st.write(exp.get("score_reasoning", ""))
-            st.write("Matching Skills:")
-            for skill in exp.get("matching_skills", []):
-                st.write(f"- {skill}")
             st.write("Missing Skills:")
             for skill in exp.get("missing_skills", []):
-                st.write(f"- {skill}")
-            st.write("Highlights:")
-            display_experience_highlights(exp.get("highlights", []))
-
-
-def display_project_scores(projects: list) -> None:
-    """Display project scores with matching skills and highlights."""
-    st.write("Project Scores:")
-    if not projects:
-        st.write("No projects found")
-        return
-
-    for proj in projects:
-        title = proj.get("name", "Unnamed Project")
-        with st.expander(f"- {title}: {proj.get('score', 0):.1f}/10"):
-            st.write("Score Reasoning:")
-            st.write(proj.get("score_reasoning", ""))
-            st.write("Matching Skills:")
-            for skill in proj.get("matching_skills", []):
-                st.write(f"- {skill}")
-            st.write("Missing Skills:")
-            for skill in proj.get("missing_skills", []):
-                st.write(f"- {skill}")
-            st.write("Highlights:")
-            display_experience_highlights(proj.get("highlights", []))
-
+                st.write(f"- {skill['name']} - {skill['importance']}/10")
+            st.write("Original Content:")
+            st.write(exp.get("original_content", ""))
 
 def display_transformed_item(item: Dict[str, Any]) -> None:
     """Display a transformed item with original and optimized versions."""
@@ -153,22 +121,18 @@ def display_transformed_item(item: Dict[str, Any]) -> None:
 def display_scoring_results(result: Dict[str, Any]) -> None:
     """Display all optimization results."""
     st.subheader("Resume Scoring")
-
-    extracted_skills = result.get("extractedSkills", {})
-    
     st.metric("Overall Resume Score", f"{result.get('overall_score', 0):.1f}/10")
-    company_info = extracted_skills.get("company_info", {})
-    display_company_info(company_info)
-
     st.write(f"**Overall Comments:** {result.get('overall_comments', '')}")
-    col1, col2 = st.columns(2)
-    with col1:
-        display_skills(result.get("missing_skills", []), "Missing Skills:")
-    with col2:
-        display_skills(result.get("existing_skills", []), "Existing Skills:")
+    st.write(f"**What to Improve:** {result.get('what_to_improve', '')}")
+    st.write(f"**Position Level:** {result.get('position_level', '')}")
+    # col1, col2 = st.columns(2)
+    # with col1:
+    #     display_skills(result.get("missing_skills", []), "Missing Skills:")
+    # with col2:
+    #     display_skills(result.get("matching_skills", []), "Existing Skills:")
 
-    display_experience_scores(result.get("professional_experience", []))
-    display_project_scores(result.get("projects", []))
+    st.write("Sections:")
+    display_entry(result.get("sections", []))
 
     # st.subheader("Suggested Optimizations Bullet Points")
     # transformed_items = result.get("transformItems", [])
