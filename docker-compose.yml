@@ -1,16 +1,14 @@
-version: '3.8'
-
 services:
   backend:
     build:
       context: .
       dockerfile: docker/backend/Dockerfile
     ports:
-      - "8080:8080"
+      - "8080:8080" 
     env_file:
       - .env
     restart: always
-
+  
   frontend:
     build:
       context: ./web
@@ -20,7 +18,7 @@ services:
     env_file:
       - ./web/.env
     environment:
-      - BACKEND_URL=http://backend:8080
+      - BACKEND_URL=http://backend:8080  # Changed from localhost to service name
     depends_on:
       - backend
-    restart: always 
+    restart: always
