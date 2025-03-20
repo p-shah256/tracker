@@ -127,7 +127,18 @@ func (l *LLM) ScoreResume(extractedSkills *types.ExtractedSkills, resumeText str
 			}
 		  ]
 		}],
-	  "overall_score": 7.5
+	  "overall_score": 7.5,
+	  "overall_comments": "overall comments on the resume, existing skills, missing skills, etc. (in 2-3 sentences)",	
+	  "missing_skills": [{
+		  "name": "skill1",
+		  "context": "exact text where mentioned",
+		  "importance": 1-10
+		}],
+	  "existing_skills": [{
+		"name": "skill1",
+		"context": "exact text where mentioned",
+		"importance": 1-10
+	  }],
 	}`, string(skillsJSON), resumeText)
 
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
@@ -158,14 +169,19 @@ func (l *LLM) ScoreResume(extractedSkills *types.ExtractedSkills, resumeText str
 	return &scoredResume, nil
 }
 
-func (l *LLM) TransformResumeBullets(extractedSkills *types.ExtractedSkills, items []types.TransformItem) ([]types.TransformItem, error) {
+func (l *LLM) TransformResumeBullets(scored *types.ScoredResume, items []types.TransformItem) ([]types.TransformItem, error) {
 	for i := range items {
 		if items[i].ID == "" {
 			items[i].ID = fmt.Sprintf("%d", i+1)
 		}
 	}
 
-	skillsJSON, err := json.Marshal(extractedSkills)
+	// only send missing skills and existing skills, and overall comments instead of sending all the extracted skills
+	scoredJSON, err := json.Marshal(types.ScoredResume{
+		MissingSkills:   scored.MissingSkills,
+		ExistingSkills:  scored.ExistingSkills,
+		OverallComments: scored.OverallComments,
+	})
 	if err != nil {
 		return nil, fmt.Errorf("failed to marshal skills data: %w", err)
 	}
@@ -175,12 +191,12 @@ func (l *LLM) TransformResumeBullets(extractedSkills *types.ExtractedSkills, ite
 		return nil, fmt.Errorf("failed to marshal items data: %w", err)
 	}
 
-	prompt := fmt.Sprintf(`Rewrite these resume bullets to make them job-targeted weapons. For each:
-		1. Address the specific weakness identified in "reasoning"
-		2. Stay within ±25%% character count
-		3. Keep original metrics but make them relevant
-		4. Front-load with technical achievements using job-specific language
-		5. Sound like an actual human professional, not HR-speak
+	prompt := fmt.Sprintf(`Transform these resume bullets to exactly match the job requirements, regardless of original content:
+		1. Replace original skills with required job skills from the missing_skills list
+		2. Keep metrics (numbers, percentages) but apply them to new context
+		3. Use direct, simple language with job-specific terms
+		4. Stay within ±25%% of original character count
+		5. Start with strong action verbs
 
 		Job Requirements:
 		%s
@@ -190,23 +206,24 @@ func (l *LLM) TransformResumeBullets(extractedSkills *types.ExtractedSkills, ite
 
 		Return as JSON array:
 		{
-		  "id": "original id",
-		  "original_text": "original text",
-		  "transformed_text": "rewritten text", 
-		  "char_count_original": 120,
-		  "char_count_new": 115,
-		  "original_skills": ["skills already in bullet"],
-		  "added_skills": ["new skills emphasized"],
-		  "original_score": 5,
-		  "new_score": 8,
-		  "reasoning": "original reasoning for low score",
-		  "improvement_explanation": "how this rewrite addresses the weaknesses"
-		}`, string(skillsJSON), string(itemsJSON))
+		"id": "original id",
+		"original_text": "original text",
+		"transformed_text": "rewritten text", 
+		"char_count_original": 120,
+		"char_count_new": 115,
+		"original_skills": ["skills already in bullet"],
+		"added_skills": ["new skills emphasized"],
+		"original_score": 5,
+		"new_score": 8,
+		"reasoning": "original reasoning for low score",
+		"improvement_explanation": "how this rewrite addresses the weaknesses"
+		}`, string(scoredJSON), string(itemsJSON))
 
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 
-	slog.Debug("sending this prompt for transform", "prompt", prompt)
+	// lets print the prompt nicely like a json object with indentations
+	slog.Debug("prompt", "prompt", prompt)
 	content, err := l.Generate(ctx, "You are a resume optimization expert who helps tailor resumes to specific job descriptions.", prompt)
 	if err != nil {
 		return nil, fmt.Errorf("resume transformation failed: %w", err)

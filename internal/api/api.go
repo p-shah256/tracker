@@ -42,147 +42,11 @@ func enableCORS(next http.HandlerFunc) http.HandlerFunc {
 }
 
 func (s *Server) Start() error {
-	http.HandleFunc("/api/extract", enableCORS(s.handleExtract))
-	http.HandleFunc("/api/match", enableCORS(s.handleMatch))
-	http.HandleFunc("/api/transform", enableCORS(s.handleTransform))
 	http.HandleFunc("/api/optimize", enableCORS(s.handleOptimize))
 
 	addr := fmt.Sprintf(":%d", s.port)
 	slog.Info("Starting API server", "port", s.port)
 	return http.ListenAndServe(addr, nil)
-}
-
-func (s *Server) handleExtract(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodPost {
-		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
-		return
-	}
-	var requestData struct {
-		JobDescText string `json:"jobDescText"`
-	}
-	if err := json.NewDecoder(r.Body).Decode(&requestData); err != nil {
-		slog.Error("Failed to parse JSON", "err", err)
-		http.Error(w, "Failed to parse JSON", http.StatusBadRequest)
-		return
-	}
-	jobDescContent := requestData.JobDescText
-	if jobDescContent == "" {
-		slog.Error("No job description provided")
-		http.Error(w, "No job description provided", http.StatusBadRequest)
-		return
-	}
-
-	extractedSkills, err := s.llmClient.ExtractSkills(jobDescContent)
-	if err != nil {
-		http.Error(w, fmt.Sprintf("Failed to extract skills: %v", err), http.StatusInternalServerError)
-		return
-	}
-
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(extractedSkills)
-}
-
-func (s *Server) handleMatch(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodPost {
-		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
-		return
-	}
-
-	var requestData struct {
-		ExtractedSkills string `json:"extractedSkills"`
-		ResumeText      string `json:"resumeText"`
-	}
-	if err := json.NewDecoder(r.Body).Decode(&requestData); err != nil {
-		slog.Error("Failed to parse JSON", "err", err)
-		http.Error(w, "Failed to parse JSON", http.StatusBadRequest)
-		return
-	}
-
-	extractedSkillsJSON := requestData.ExtractedSkills
-	if extractedSkillsJSON == "" {
-		http.Error(w, "No extracted skills provided", http.StatusBadRequest)
-		return
-	}
-	var extractedSkills types.ExtractedSkills
-	if err := json.Unmarshal([]byte(extractedSkillsJSON), &extractedSkills); err != nil {
-		http.Error(w, "Invalid extracted skills format", http.StatusBadRequest)
-		return
-	}
-
-	resumeText := requestData.ResumeText
-	if resumeText == "" {
-		http.Error(w, "No resume text provided", http.StatusBadRequest)
-		return
-	}
-
-	scoredResume, err := s.llmClient.ScoreResume(&extractedSkills, resumeText)
-	if err != nil {
-		http.Error(w, fmt.Sprintf("Failed to score resume: %v", err), http.StatusInternalServerError)
-		return
-	}
-
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(scoredResume)
-}
-
-func (s *Server) handleTransform(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodPost {
-		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
-		return
-	}
-
-	var requestData struct {
-		ExtractedSkills string `json:"extractedSkills"`
-		Items           string `json:"items"`
-		EmphasisLevel   string `json:"emphasisLevel"`
-	}
-
-	if err := json.NewDecoder(r.Body).Decode(&requestData); err != nil {
-		slog.Error("Failed to parse JSON", "err", err)
-		http.Error(w, "Failed to parse JSON", http.StatusBadRequest)
-		return
-	}
-	extractedSkillsJSON := requestData.ExtractedSkills
-	if extractedSkillsJSON == "" {
-		http.Error(w, "No extracted skills provided", http.StatusBadRequest)
-		return
-	}
-
-	itemsJSON := requestData.Items
-	if itemsJSON == "" {
-		http.Error(w, "No items provided", http.StatusBadRequest)
-		return
-	}
-
-	emphasisLevel := requestData.EmphasisLevel
-	if emphasisLevel == "" {
-		emphasisLevel = "Moderate" // Default value
-	}
-
-	var extractedSkills types.ExtractedSkills
-	if err := json.Unmarshal([]byte(extractedSkillsJSON), &extractedSkills); err != nil {
-		http.Error(w, "Invalid extracted skills format", http.StatusBadRequest)
-		return
-	}
-
-	var items []types.TransformItem
-	if err := json.Unmarshal([]byte(itemsJSON), &items); err != nil {
-		http.Error(w, "Invalid items format", http.StatusBadRequest)
-		return
-	}
-
-	transformedItems, err := s.llmClient.TransformResumeBullets(&extractedSkills, items)
-	if err != nil {
-		http.Error(w, fmt.Sprintf("Failed to transform resume: %v", err), http.StatusInternalServerError)
-		return
-	}
-
-	response := types.TransformResponse{
-		Items: transformedItems,
-	}
-
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(response)
 }
 
 func (s *Server) handleOptimize(w http.ResponseWriter, r *http.Request) {
@@ -251,7 +115,7 @@ func (s *Server) handleOptimize(w http.ResponseWriter, r *http.Request) {
 				Name:              proj.Name,
 				OriginalScore:     highlight.Score,
 				CharCountOriginal: len(highlight.Text),
-				Reasoning: highlight.Reasoning,
+				Reasoning:         highlight.Reasoning,
 			})
 		}
 	}
@@ -262,7 +126,7 @@ func (s *Server) handleOptimize(w http.ResponseWriter, r *http.Request) {
 	})
 
 	// send only lowest 7
-	transformedItems, err := s.llmClient.TransformResumeBullets(skills, itemsToTransform[:7])
+	transformedItems, err := s.llmClient.TransformResumeBullets(scored, itemsToTransform[:7])
 	if err != nil {
 		slog.Error("Transform failed", "err", err)
 		http.Error(w, "Transform failed", http.StatusInternalServerError)

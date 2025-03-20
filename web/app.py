@@ -136,20 +136,26 @@ def display_transformed_item(item: Dict[str, Any]) -> None:
 
 def display_optimization_results(result: Dict[str, Any]) -> None:
     """Display all optimization results."""
-    st.subheader("Extracted Skills")
+    st.subheader("Resume Scoring")
+    scored_resume = result.get("scoredResume", {})
+
     extracted_skills = result.get("extractedSkills", {})
+    
+    st.metric("Overall Resume Score", f"{scored_resume.get('overall_score', 0):.1f}/10")
     company_info = extracted_skills.get("company_info", {})
     display_company_info(company_info)
 
+    # no need to show extracted skills
+    # st.subheader("Extracted Skills")
+
+
+    # TODO: need to add overall comments on the resume, existing skills, missing skills, etc.
+    st.write(f"**Overall Comments:** {scored_resume.get('overall_comments', '')}")
     col1, col2 = st.columns(2)
     with col1:
-        display_skills(extracted_skills.get("required_skills", []), "Required Skills:")
+        display_skills(scored_resume.get("missing_skills", []), "Missing Skills:")
     with col2:
-        display_skills(extracted_skills.get("nice_to_have_skills", []), "Nice to Have Skills:")
-
-    st.subheader("Resume Scoring")
-    scored_resume = result.get("scoredResume", {})
-    st.metric("Overall Resume Score", f"{scored_resume.get('overall_score', 0):.1f}/10")
+        display_skills(scored_resume.get("existing_skills", []), "Existing Skills:")
 
     display_experience_scores(scored_resume.get("professional_experience", []))
     display_project_scores(scored_resume.get("projects", []))
@@ -161,16 +167,19 @@ def display_optimization_results(result: Dict[str, Any]) -> None:
 
 def handle_optimize_request(jd_text: str, resume_text: str) -> None:
     """Handle the optimization request."""
-    try:
-        response = requests.post(
-            f"{BACKEND_URL}/api/optimize",
-            json={"jobDescText": jd_text, "resume": resume_text}
-        )
-        response.raise_for_status()
-        result = response.json()
-        display_optimization_results(result)
-    except requests.exceptions.RequestException as e:
-        st.error(f"Error communicating with backend: {str(e)}")
+    with st.spinner("Optimizing your resume..."):
+        try:
+            response = requests.post(
+                f"{BACKEND_URL}/api/optimize",
+                json={"jobDescText": jd_text, "resume": resume_text}
+            )
+            response.raise_for_status()
+            result = response.json()
+            display_optimization_results(result)
+        except requests.exceptions.RequestException as e:
+            st.error(f"Error communicating with backend: {str(e)}")
+        except Exception as e:
+            st.error(f"Error: {str(e)}")
 
 def render_login_page() -> None:
     """Render the login page."""
@@ -190,13 +199,14 @@ def render_main_app() -> None:
     """Render the main application."""
     st.set_page_config(page_title="Resume Optimizer", layout="wide")
     
-    with st.sidebar:
-        st.write(f"Logged in as: {st.session_state['username']} ({st.session_state['user_role']})")
-        if st.button("Logout"):
-            st.session_state["authenticated"] = False
-            st.session_state["username"] = ""
-            st.session_state["user_role"] = ""
-            st.rerun()
+    st.success(f"Logged in as: {st.session_state['username']} ({st.session_state['user_role']})")
+    
+    def logout():
+        st.session_state["authenticated"] = False
+        st.session_state["username"] = ""
+        st.session_state["user_role"] = ""
+        st.rerun()
+    st.button("Logout", on_click=logout)
 
     st.title("Resume Optimizer")
     st.markdown("Make your resume look like it was made for this specific job!")

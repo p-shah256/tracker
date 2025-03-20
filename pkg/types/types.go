@@ -2,8 +2,9 @@ package types
 
 // =============== Extraction TYPES ===============
 type ExtractedSkill struct {
-	Name    string `json:"name"`
-	Context string `json:"context"`
+	Name       string `json:"name"`
+	Context    string `json:"context"`
+	Importance int    `json:"importance"`
 }
 
 type CompanyInfo struct {
@@ -23,6 +24,9 @@ type ScoredResume struct {
 	ProfessionalExperience []ExperienceEntry `json:"professional_experience"`
 	Projects               []ProjectEntry    `json:"projects"`
 	OverallScore           float64           `json:"overall_score"`
+	OverallComments        string            `json:"overall_comments"`
+	MissingSkills          []ExtractedSkill  `json:"missing_skills"`
+	ExistingSkills         []ExtractedSkill  `json:"existing_skills"`
 }
 
 type ExperienceEntry struct {
