@@ -3,11 +3,16 @@ package api
 import (
 	"encoding/json"
 	"fmt"
+	"io"
 	"log/slog"
 	"net/http"
 	"os"
+	"strings"
+	"time"
 
 	"github.com/p-shah256/tracker/internal/llm"
+	"github.com/p-shah256/tracker/pkg/errors"
+	"github.com/p-shah256/tracker/pkg/logger"
 	"github.com/p-shah256/tracker/pkg/types"
 )
 
@@ -31,7 +36,7 @@ func enableCORS(next http.HandlerFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Access-Control-Allow-Origin", "*")
 		w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
-		w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization")
+		w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization, X-Request-ID")
 		if r.Method == "OPTIONS" {
 			w.WriteHeader(http.StatusOK)
 			return
@@ -40,9 +45,23 @@ func enableCORS(next http.HandlerFunc) http.HandlerFunc {
 	}
 }
 
+func applyMiddleware(handler http.HandlerFunc, methods ...string) http.HandlerFunc {
+	return enableCORS(
+		RequestID(
+			Logger(
+				Recover(
+					MethodChecker(methods...)(handler),
+				),
+			),
+		),
+	)
+}
+
 func (s *Server) Start() error {
-	http.HandleFunc("/api/score", enableCORS(s.handleScore))
-	http.HandleFunc("/api/transformSection", enableCORS(s.handleTransformSection))
+	http.HandleFunc("/score", applyMiddleware(s.handleScore, http.MethodPost))
+	http.HandleFunc("/transformSection", applyMiddleware(s.handleTransformSection, http.MethodPost))
+	http.HandleFunc("/upload/resume", applyMiddleware(s.handleUploadResume, http.MethodPost))
+	http.HandleFunc("/health", applyMiddleware(s.handleHealthCheck, http.MethodGet))
 
 	addr := fmt.Sprintf(":%d", s.port)
 	slog.Info("Starting API server", "port", s.port)
@@ -50,132 +69,152 @@ func (s *Server) Start() error {
 }
 
 func (s *Server) handleScore(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodPost {
-		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
-		return
-	}
+	requestID := logger.GetRequestID(r.Context())
 
 	var req types.OptimizeRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		slog.Error("Failed to parse request", "err", err)
-		http.Error(w, "Bad request", http.StatusBadRequest)
+		slog.Error("Failed to parse request",
+			"err", err,
+			"request_id", requestID,
+		)
+		RespondWithError(w, errors.ErrBadRequest("Invalid JSON format: "+err.Error()).WithRequestID(requestID))
 		return
 	}
 
-	if req.JobDescText == "" || req.Resume == "" {
-		http.Error(w, "Missing job description or resume", http.StatusBadRequest)
+	if req.JobDescText == "" {
+		RespondWithError(w, errors.ErrBadRequest("Job description is required").WithRequestID(requestID))
+		return
+	}
+
+	if req.Resume == "" {
+		RespondWithError(w, errors.ErrBadRequest("Resume content is required").WithRequestID(requestID))
 		return
 	}
 
 	skills, err := s.llmClient.ExtractSkills(req.JobDescText)
 	if err != nil {
-		slog.Error("Extract failed", "err", err)
-		http.Error(w, "Extract failed", http.StatusInternalServerError)
+		slog.Error("Skills extraction failed",
+			"err", err,
+			"request_id", requestID,
+		)
+		RespondWithError(w, errors.ErrLLMProcessing("Failed to extract skills: "+err.Error()).WithRequestID(requestID))
 		return
 	}
 
 	scored, err := s.llmClient.ScoreResume(skills, req.Resume)
 	if err != nil {
-		slog.Error("Scoring failed", "err", err)
-		http.Error(w, "Scoring failed", http.StatusInternalServerError)
+		slog.Error("Resume scoring failed",
+			"err", err,
+			"request_id", requestID,
+		)
+		RespondWithError(w, errors.ErrLLMProcessing("Failed to score resume: "+err.Error()).WithRequestID(requestID))
 		return
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	if err := json.NewEncoder(w).Encode(scored); err != nil {
-		slog.Error("Response encoding failed", "err", err)
-	}
+	RespondWithJSON(w, http.StatusOK, scored)
 }
 
 func (s *Server) handleTransformSection(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodPost {
-		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+	requestID := logger.GetRequestID(r.Context())
+
+	var req types.Section
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		slog.Error("Failed to parse section",
+			"err", err,
+			"request_id", requestID,
+		)
+		RespondWithError(w, errors.ErrBadRequest("Invalid JSON format: "+err.Error()).WithRequestID(requestID))
 		return
 	}
 
-	// get the section to transform from request
-	var req types.Section
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		slog.Error("Failed to parse request", "err", err)
-		http.Error(w, "Bad request", http.StatusBadRequest)
+	if req.Name == "" {
+		RespondWithError(w, errors.ErrBadRequest("Section name is required").WithRequestID(requestID))
 		return
 	}
 
 	transformedItems, err := s.llmClient.TransformResumeBullets(&req)
 	if err != nil {
-		slog.Error("Transform failed", "err", err)
-		http.Error(w, "Transform failed", http.StatusInternalServerError)
+		slog.Error("Section transformation failed",
+			"err", err,
+			"section", req.Name,
+			"request_id", requestID,
+		)
+		RespondWithError(w, errors.ErrLLMProcessing("Failed to transform section: "+err.Error()).WithRequestID(requestID))
 		return
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	if err := json.NewEncoder(w).Encode(transformedItems); err != nil {
-		slog.Error("Response encoding failed", "err", err)
-		return
-	}
+	RespondWithJSON(w, http.StatusOK, transformedItems)
 }
 
-// func (s *Server) handleOptimize(w http.ResponseWriter, r *http.Request) {
-// 	var itemsToTransform []types.TransformItem
+func (s *Server) handleUploadResume(w http.ResponseWriter, r *http.Request) {
+	requestID := logger.GetRequestID(r.Context())
 
-// 	// TODO: yeah I don't like this likde don't hardcode items... "exp, proj"
+	// Parse the multipart form with 10 MB max memory
+	if err := r.ParseMultipartForm(10 << 20); err != nil {
+		slog.Error("Failed to parse multipart form", "err", err, "request_id", requestID)
+		RespondWithError(w, errors.ErrBadRequest("Invalid form data: "+err.Error()).WithRequestID(requestID))
+		return
+	}
 
-// 	// Collect all highlights with scores
-// 	for _, exp := range scored.ProfessionalExperience {
-// 		for _, highlight := range exp.Highlights {
-// 			// Inside the loops:
-// 			itemsToTransform = append(itemsToTransform, types.TransformItem{
-// 				ID:                fmt.Sprintf("exp-%s-%d", exp.Company, len(itemsToTransform)),
-// 				OriginalText:      highlight.Text,
-// 				OriginalSkills:    highlight.MatchingSkills, // Note this name change
-// 				Section:           "experience",
-// 				Company:           exp.Company,
-// 				Position:          exp.Position,
-// 				OriginalScore:     highlight.Score,     // Renamed from Score
-// 				CharCountOriginal: len(highlight.Text), // Added this
-// 				Reasoning:         highlight.Reasoning,
-// 			})
-// 		}
-// 	}
+	file, header, err := r.FormFile("resume")
+	if err != nil {
+		slog.Error("Failed to get file from request", "err", err, "request_id", requestID)
+		RespondWithError(w, errors.ErrBadRequest("Failed to get file: "+err.Error()).WithRequestID(requestID))
+		return
+	}
+	defer file.Close()
 
-// 	// TODO: do this twice, once for projects and once for experiecnce
-// 	for _, proj := range scored.Projects {
-// 		for _, highlight := range proj.Highlights {
-// 			// Inside the loops:
-// 			itemsToTransform = append(itemsToTransform, types.TransformItem{
-// 				ID:                fmt.Sprintf("proj-%s-%d", proj.Name, len(itemsToTransform)),
-// 				OriginalText:      highlight.Text,
-// 				OriginalSkills:    highlight.MatchingSkills,
-// 				Section:           "projects",
-// 				Name:              proj.Name,
-// 				OriginalScore:     highlight.Score,
-// 				CharCountOriginal: len(highlight.Text),
-// 				Reasoning:         highlight.Reasoning,
-// 			})
-// 		}
-// 	}
+	if !strings.HasSuffix(strings.ToLower(header.Filename), ".pdf") {
+		slog.Error("Invalid file type", "filename", header.Filename, "request_id", requestID)
+		RespondWithError(w, errors.ErrBadRequest("Only PDF files are allowed").WithRequestID(requestID))
+		return
+	}
 
-// 	// Sort items by score (descending)
-// 	sort.Slice(itemsToTransform, func(i, j int) bool {
-// 		return itemsToTransform[i].OriginalScore < itemsToTransform[j].OriginalScore
-// 	})
+	fileBytes, err := io.ReadAll(file)
+	if err != nil {
+		slog.Error("Failed to read file", "err", err, "filename", header.Filename, "request_id", requestID)
+		RespondWithError(w, errors.ErrInternalServer("Failed to process file: "+err.Error()).WithRequestID(requestID))
+		return
+	}
 
-// 	// send only lowest 7
-// 	transformedItems, err := s.llmClient.TransformResumeBullets(scored, itemsToTransform[:7])
-// 	if err != nil {
-// 		slog.Error("Transform failed", "err", err)
-// 		http.Error(w, "Transform failed", http.StatusInternalServerError)
-// 		return
-// 	}
+	slog.Info("Resume uploaded", "filename", header.Filename, "size", len(fileBytes), "request_id", requestID)
 
-// 	response := types.OptimizeResponse{
-// 		ExtractedSkills:  *skills,
-// 		ScoredResume:     *scored,
-// 		TransformedItems: transformedItems,
-// 	}
+	// TODO: decide if you want to extract text here or just send it over to LLM?
 
-// 	w.Header().Set("Content-Type", "application/json")
-// 	if err := json.NewEncoder(w).Encode(response); err != nil {
-// 		slog.Error("Response encoding failed", "err", err)
-// 	}
-// }
+	response := map[string]string{
+		"message":  "Resume uploaded successfully",
+		"filename": header.Filename,
+		"size":     fmt.Sprintf("%d bytes", len(fileBytes)),
+	}
+
+	RespondWithJSON(w, http.StatusOK, response)
+}
+
+func (s *Server) handleHealthCheck(w http.ResponseWriter, r *http.Request) {
+	requestID := logger.GetRequestID(r.Context())
+
+	// Create a more detailed health check response
+	health := map[string]any{
+		"status":     "up",
+		"timestamp":  time.Now().Unix(),
+		"version":    "1.0.0",
+		"request_id": requestID,
+	}
+
+	llmStatus := "unknown"
+	dbStatus := "unknown"
+	// This would depend on your LLM client implementation
+	// For example, you could add a Ping() method to your llm.LLM type
+	// if err := s.llmClient.Ping(); err == nil {
+	//    llmStatus = "available"
+	// } else {
+	//    llmStatus = "unavailable: " + err.Error()
+	// }
+
+	health["services"] = map[string]any{
+		"llm": llmStatus,
+		"db":  dbStatus,
+	}
+
+	RespondWithJSON(w, http.StatusOK, health)
+}

@@ -62,8 +62,20 @@ def score_resume():
 
 
 def save_inputs():
-    st.session_state.jd_text = st.session_state.jd_input
-    st.session_state.resume_text = st.session_state.resume_input
+    if st.session_state.get("jd_input"):
+        st.session_state.jd_text = st.session_state.jd_input
+    if st.session_state.get("resume_input"):
+        st.session_state.resume_text = st.session_state.resume_input
+
+    if "jd_file" in st.session_state and st.session_state.jd_file is not None:
+        jd_file = st.session_state.jd_file
+        if jd_file is not None:
+            st.session_state.jd_text = jd_file.getvalue().decode("utf-8")
+
+    if "resume_file" in st.session_state and st.session_state.resume_file is not None:
+        resume_file = st.session_state.resume_file
+        if resume_file is not None:
+            st.session_state.resume_text = resume_file.getvalue().decode("utf-8")
 
 
 st.set_page_config(page_title="TailorMyResume", layout="wide")
@@ -73,21 +85,57 @@ st.markdown("Make your resume look like it was made for this specific job!")
 col1, col2 = st.columns(2)
 with col1:
     st.subheader("Job Description")
-    st.text_area(
-        "Paste job description here:",
-        height=300,
-        key="jd_input",
-        value=st.session_state.jd_text,
+
+    jd_method = st.radio(
+        "Input method for job description:",
+        ["Paste text", "Upload file"],
+        key="jd_method",
     )
+
+    if jd_method == "Paste text":
+        st.text_area(
+            "Paste job description here:",
+            height=300,
+            key="jd_input",
+            value=st.session_state.jd_text,
+        )
+    else:
+        st.file_uploader(
+            "Upload job description file (txt, pdf, docx):",
+            type=["txt", "pdf", "docx"],
+            key="jd_file",
+            help="Upload a text file containing the job description",
+        )
+        if "jd_file" in st.session_state and st.session_state.jd_file is not None:
+            st.success(f"Uploaded: {st.session_state.jd_file.name}")
+
 
 with col2:
     st.subheader("Your Resume")
-    st.text_area(
-        "Paste resume here:",
-        height=300,
-        key="resume_input",
-        value=st.session_state.resume_text,
+
+    resume_method = st.radio(
+        "Input method for resume:", ["Paste text", "Upload file"], key="resume_method"
     )
+
+    if resume_method == "Paste text":
+        st.text_area(
+            "Paste resume here:",
+            height=300,
+            key="resume_input",
+            value=st.session_state.resume_text,
+        )
+    else:
+        st.file_uploader(
+            "Upload resume file (txt, pdf, docx):",
+            type=["txt", "pdf", "docx"],
+            key="resume_file",
+            help="Upload a text file containing your resume",
+        )
+        if (
+            "resume_file" in st.session_state
+            and st.session_state.resume_file is not None
+        ):
+            st.success(f"Uploaded: {st.session_state.resume_file.name}")
 
 if st.button("Score Resume"):
     save_inputs()
